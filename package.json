@@ -1,0 +1,13 @@
+{
+  "name": "granada2031",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Granada 2031 - Geolocalizacion del Sentimiento. Servidor Bun con SQLite integrado, sin dependencias externas.",
+  "scripts": {
+    "start": "bun run server.ts",
+    "test": "bun test"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  }
+}

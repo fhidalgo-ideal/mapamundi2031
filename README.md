@@ -1,56 +1,56 @@
 # Granada 2031 - Geolocalizacion del Sentimiento
 
-MVP navegable con almacenamiento en servidor para la accion "Geolocalizacion del Sentimiento".
+Navigable MVP with server-side storage for the "Geolocalizacion del Sentimiento" campaign.
 
-El mapa publico soporta zoom con rueda del raton, controles `+`/`-`, restablecer vista y arrastre para moverse por regiones con alta concentracion de fotos.
+The public map supports mouse-wheel zoom, `+`/`-` controls, view reset, and drag panning across regions with a high concentration of photos.
 
-## Almacenamiento elegido
+## Storage
 
-El MVP usa SQLite como base de datos local del servidor:
+The MVP uses SQLite as the server's local database:
 
-- Archivo de base de datos: `data/granada2031.sqlite3`
-- Imagenes subidas: `uploads/`
-- Secretos de administracion: `.dev` (ignorado por git)
-- Configuracion publica: `config.json`
-- Servidor: Python 3 con libreria estandar, sin dependencias externas
+- Database file: `data/granada2031.sqlite3`
+- Uploaded images: `uploads/`
+- Admin secrets: `.dev` (git-ignored)
+- Public configuration: `config.json`
+- Server: Bun (JavaScript/TypeScript runtime) with built-in SQLite support (`bun:sqlite`), no external dependencies
 
-SQLite es la opcion mas adecuada para esta fase porque Ubuntu 24 incluye Python con soporte `sqlite3`, no requiere administrar un servicio de base de datos separado, permite backups sencillos copiando un unico archivo y soporta sin problema una primera campana participativa moderada.
+SQLite is the right choice for this phase: it needs no separate database service, backups are a single-file copy, and it comfortably handles a first moderated participatory campaign.
 
-Para una fase de produccion con miles de contribuciones, busqueda geografica avanzada, analitica o administracion multiusuario, la migracion natural seria PostgreSQL con PostGIS y almacenamiento de imagenes en S3/MinIO.
+For a production phase with thousands of contributions, advanced geo search, analytics, or multi-user administration, the natural migration path is PostgreSQL with PostGIS and image storage in S3/MinIO.
 
-## Ejecutar en Ubuntu 22.04
+## Running on Ubuntu 22.04
 
 ```bash
-cd /ruta/del/proyecto
-python3 server.py --host 0.0.0.0 --port 8080
+cd /path/to/project
+bun run server.ts --host 0.0.0.0 --port 8080
 ```
 
-Abrir:
+Open:
 
 ```text
-http://IP_DEL_SERVIDOR:8080
+http://SERVER_IP:8080
 ```
 
-En local, si estas trabajando en la propia maquina:
+Locally, if you're working on the machine itself:
 
 ```text
 http://localhost:8080
 ```
 
-Importante: no abras `index.html` con doble clic ni con un servidor estatico separado. La subida de fotos necesita que esta misma aplicacion se sirva desde `server.py`, porque ahi viven la API, SQLite y la carpeta `uploads/`.
+Important: don't open `index.html` by double-clicking it or via a separate static server. Photo uploads need this same application served from `server.ts`, because that's where the API, SQLite, and the `uploads/` folder live.
 
-## Password de administracion
+## Admin password
 
-La administracion esta protegida por backend. Los secretos viven en un archivo `.dev` local que **no se sube al repositorio** (esta en `.gitignore`). Si no existe, el servidor lo crea al arrancar con un secreto de sesion aleatorio. Cambia estos valores antes de publicar:
+Administration is protected server-side. Secrets live in a local `.dev` file that **is not committed to the repository** (it's in `.gitignore`). If it doesn't exist, the server creates it on startup with a random session secret. Change these values before publishing:
 
 ```json
 {
-  "admin_password": "cambia-esta-password",
-  "admin_session_secret": "cambia-tambien-este-secreto-largo"
+  "admin_password": "change-this-password",
+  "admin_session_secret": "change-this-long-secret-too"
 }
 ```
 
-Los textos visibles siguen en `config.json`, que si se versiona. `/api/config` solo entrega el bloque `public` al navegador, nunca la password ni el secreto de sesion:
+Visible text still lives in `config.json`, which is versioned. `/api/config` only returns the `public` block to the browser, never the password or the session secret:
 
 ```json
 {
@@ -70,36 +70,36 @@ Los textos visibles siguen en `config.json`, que si se versiona. `/api/config` s
 }
 ```
 
-Los archivos deben estar en la raiz del proyecto:
+These files must be at the project root:
 
 ```text
-.dev          # secretos, ignorado por git
-config.json   # textos publicos, versionado
+.dev          # secrets, git-ignored
+config.json   # public text, versioned
 ```
 
-Despues de modificarlo:
+After editing it:
 
 ```bash
 sudo systemctl restart mapamundi
 ```
 
-## Textos, logos y enlaces legales
+## Text, logos, and legal links
 
-La portada lee los textos visibles desde `config.json`, dentro del bloque `public`. Ahi puedes cambiar:
+The homepage reads visible text from `config.json`, inside the `public` block. There you can change:
 
-- Titulo del navegador, nombre/subtitulo de marca y logo principal.
-- Textos de hero, llamada a participar, mapa, formulario y archivo.
-- Texto de consentimiento del formulario.
-- Footer, enlace a politica de privacidad, enlace a aviso legal y logo de IDEAL.
+- Browser title, brand name/subtitle, and main logo.
+- Hero, call-to-action, map, form, and archive text.
+- Form consent text.
+- Footer, privacy policy link, legal notice link, and IDEAL logo.
 
-Para usar logos, sube los archivos al proyecto, por ejemplo:
+To use logos, upload the files to the project, e.g.:
 
 ```text
 /var/www/mapamundi/assets/logo-granada2031.png
 /var/www/mapamundi/assets/logo-ideal.png
 ```
 
-Y configura sus rutas como URLs relativas:
+And set their paths as relative URLs:
 
 ```json
 {
@@ -110,17 +110,17 @@ Y configura sus rutas como URLs relativas:
 }
 ```
 
-Si dejas `brand_logo` o `ideal_logo` vacios, la web usa el marcador visual por defecto y el texto `IDEAL`.
+If you leave `brand_logo` or `ideal_logo` empty, the site falls back to the default visual placeholder and the `IDEAL` text.
 
-## Comprobacion rapida de API
+## Quick API check
 
-Si la API esta bien conectada, esto debe devolver JSON:
+If the API is wired up correctly, this should return JSON:
 
 ```bash
 curl http://localhost:8080/api/health
 ```
 
-Respuesta esperada:
+Expected response:
 
 ```json
 {
@@ -130,11 +130,11 @@ Respuesta esperada:
 }
 ```
 
-Si `https://mapamundi.2031granadaideal.es/api/health` devuelve 404, Nginx no esta reenviando `/api` al proceso Python.
+If `https://mapamundi.2031granadaideal.es/api/health` returns 404, Nginx isn't forwarding `/api` to the Bun process.
 
-## Configuracion Nginx recomendada
+## Recommended Nginx configuration
 
-Usa Nginx como proxy completo hacia `server.py`. No sirvas `index.html` directamente desde Nginx en este MVP, porque la API vive en el mismo servidor Python.
+Use Nginx as a full proxy in front of `server.ts`. Don't serve `index.html` directly from Nginx in this MVP, since the API lives on the same Bun server.
 
 ```nginx
 server {
@@ -154,14 +154,14 @@ server {
 }
 ```
 
-Despues:
+Then:
 
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## API incluida
+## Included API
 
 ```text
 GET    /api/traces
@@ -174,29 +174,29 @@ PATCH  /api/admin/traces/{id}
 DELETE /api/admin/traces/{id}
 ```
 
-`GET /api/traces` solo devuelve contribuciones aprobadas.
+`GET /api/traces` only returns approved contributions.
 
-Los endpoints `/api/admin/*` requieren login. El frontend obtiene un token temporal con la password definida en `.dev`.
+`/api/admin/*` endpoints require login. The frontend obtains a temporary token using the password defined in `.dev`.
 
-## Acceso a administracion
+## Admin access
 
-Abre la administracion desde:
+Open the admin panel from:
 
 ```text
 https://mapamundi.2031granadaideal.es/admin
 ```
 
-Tambien funciona:
+This also works:
 
 ```text
 https://mapamundi.2031granadaideal.es/admin/
 ```
 
-La portada publica no muestra el acceso a administracion. La pantalla de revision vive en `admin.html`, servida desde `/admin`. Se incluye tambien `admin/index.html` como redireccion de compatibilidad por si el servidor interpreta `/admin/` como carpeta estatica.
+The public homepage doesn't surface the admin entry point. The review screen lives in `admin.html`, served from `/admin`. `admin/index.html` is also included as a compatibility redirect in case the server treats `/admin/` as a static folder.
 
-No abras directamente rutas como `/api/admin` o `/api/admin/login`; son endpoints internos para el formulario.
+Don't open routes like `/api/admin` or `/api/admin/login` directly; they're internal endpoints for the form.
 
-Si `/admin/` devuelve "File not found", comprueba en el servidor:
+If `/admin/` returns "File not found", check on the server:
 
 ```bash
 ls -la /var/www/mapamundi/admin/
@@ -204,7 +204,7 @@ ls -la /var/www/mapamundi/admin.html
 sudo systemctl restart mapamundi
 ```
 
-`POST /api/traces` recibe un formulario `multipart/form-data` con:
+`POST /api/traces` accepts a `multipart/form-data` submission with:
 
 - `name`
 - `email`
@@ -216,31 +216,31 @@ sudo systemctl restart mapamundi
 - `consent`
 - `photo`
 
-Las contribuciones nuevas entran como `pending`. Desde la seccion "Cola de revision" se pueden aprobar o rechazar.
+New contributions come in as `pending`. From the "Review queue" section they can be approved or rejected.
 
-## Solucion de problemas
+## Troubleshooting
 
-Si al subir una foto aparece un error de peticion o de API, comprueba:
+If a photo upload triggers a request or API error, check:
 
-1. Que el servidor esta arrancado:
+1. That the server is running:
 
 ```bash
-python3 server.py --host 0.0.0.0 --port 8080
+bun run server.ts --host 0.0.0.0 --port 8080
 ```
 
-2. Que has abierto la web desde la URL del servidor:
+2. That you opened the site from the server's URL:
 
 ```text
 http://localhost:8080
 ```
 
-3. Que no estas entrando mediante:
+3. That you're not accessing it via:
 
 ```text
 file:///...
 ```
 
-4. Que el usuario del proceso tiene permisos de escritura en:
+4. That the process user has write permissions on:
 
 ```text
 data/
@@ -249,20 +249,20 @@ uploads/
 
 ## Backup
 
-Detener el servicio o hacer una copia atomica con SQLite:
+Stop the service, or take an atomic SQLite backup:
 
 ```bash
 sqlite3 data/granada2031.sqlite3 ".backup 'backup-granada2031.sqlite3'"
 tar -czf backup-uploads.tar.gz uploads/
 ```
 
-## Nota de seguridad para produccion
+## Production security note
 
-Este MVP prioriza navegabilidad y flujo tecnico. Antes de publicarlo deberia anadirse:
+This MVP prioritizes navigability and technical flow. Before publishing it, the following should be added:
 
-- Autenticacion para la cola de revision.
-- HTTPS mediante Nginx/Caddy.
-- Politica RGPD completa.
-- Escaneo/normalizacion de imagenes.
-- Limites por IP y proteccion anti-spam.
-- Separacion entre API publica y panel de administracion.
+- Authentication for the review queue.
+- HTTPS via Nginx/Caddy.
+- Full GDPR policy.
+- Image scanning/normalization.
+- Per-IP limits and anti-spam protection.
+- Separation between the public API and the admin panel.

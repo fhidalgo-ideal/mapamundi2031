@@ -6,8 +6,9 @@
 
 **Status**: Ready for Planning
 
-**Input**: MVP de "Geolocalización del Sentimiento" (Granada 2031) ya funcional en `server.py`
-(Python 3 stdlib + SQLite) con formulario público de contribución y panel de administración.
+**Input**: MVP de "Geolocalización del Sentimiento" (Granada 2031) ya funcional en `server.ts`
+(Bun + `bun:sqlite`; originalmente `server.py` con Python 3 stdlib, reescrito manteniendo la misma
+API) con formulario público de contribución y panel de administración.
 El propio `README.md` (sección "Nota de seguridad para producción") deja pendiente, antes de
 publicar: autenticación de la cola de revisión, HTTPS, RGPD completo, escaneo/normalización de
 imágenes, límites por IP/anti-spam y separación entre API pública y panel de administración.
@@ -233,17 +234,16 @@ temporalmente aunque la contraseña sea correcta.
 
 ## Assumptions
 
-- El servidor sigue siendo Python 3 con librería estándar únicamente ("sin dependencias
-  externas", per README) — todo lo anterior (firma de imagen, dimensiones, EXIF, cabeceras,
-  límites de tasa) se implementa sin instalar paquetes nuevos (sin Pillow, sin frameworks web).
+- El servidor sigue siendo Bun sin dependencias npm de terceros ("sin dependencias externas", per
+  README) — todo lo anterior (firma de imagen, dimensiones, EXIF, cabeceras, límites de tasa) se
+  implementa sin instalar paquetes nuevos (sin `sharp`, sin frameworks web).
 - No se requiere despliegue como parte de esta feature: el hardening se valida localmente con el
   smoke test de FR-012; el `systemctl restart mapamundi` en producción sigue siendo manual, según
   el flujo ya documentado en el README.
-- El límite de tasa y el bloqueo de login son en memoria de proceso (`ThreadingHTTPServer` de un
-  solo proceso); no hace falta un almacén compartido porque el proyecto corre como un único
-  proceso.
-- Ya existe control de acceso por token HMAC en `/api/admin/*` (`require_admin`/`valid_admin_token`
-  en `server.py`); esta feature NO rediseña esa autenticación, solo le añade auditoría y freno de
+- El límite de tasa y el bloqueo de login son en memoria de proceso (`Bun.serve` de un solo
+  proceso); no hace falta un almacén compartido porque el proyecto corre como un único proceso.
+- Ya existe control de acceso por token HMAC en `/api/admin/*` (`requireAdmin`/`validAdminToken`
+  en `server.ts`); esta feature NO rediseña esa autenticación, solo le añade auditoría y freno de
   fuerza bruta (User Story 5).
 - El envío de email no está disponible en este MVP; por eso el borrado de datos (User Story 3) se
   resuelve con un token de un solo uso devuelto en el momento de crear la contribución, en vez de
