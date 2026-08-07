@@ -10,7 +10,8 @@ El MVP usa SQLite como base de datos local del servidor:
 
 - Archivo de base de datos: `data/granada2031.sqlite3`
 - Imagenes subidas: `uploads/`
-- Configuracion privada: `config.json`
+- Secretos de administracion: `.dev` (ignorado por git)
+- Configuracion publica: `config.json`
 - Servidor: Python 3 con libreria estandar, sin dependencias externas
 
 SQLite es la opcion mas adecuada para esta fase porque Ubuntu 24 incluye Python con soporte `sqlite3`, no requiere administrar un servicio de base de datos separado, permite backups sencillos copiando un unico archivo y soporta sin problema una primera campana participativa moderada.
@@ -40,12 +41,19 @@ Importante: no abras `index.html` con doble clic ni con un servidor estatico sep
 
 ## Password de administracion
 
-La administracion esta protegida por backend. Cambia estos valores antes de publicar. El bloque `public` se puede mantener en el mismo archivo porque `/api/config` solo entrega esa parte publica al navegador, nunca la password ni el secreto de sesion:
+La administracion esta protegida por backend. Los secretos viven en un archivo `.dev` local que **no se sube al repositorio** (esta en `.gitignore`). Si no existe, el servidor lo crea al arrancar con un secreto de sesion aleatorio. Cambia estos valores antes de publicar:
 
 ```json
 {
   "admin_password": "cambia-esta-password",
-  "admin_session_secret": "cambia-tambien-este-secreto-largo",
+  "admin_session_secret": "cambia-tambien-este-secreto-largo"
+}
+```
+
+Los textos visibles siguen en `config.json`, que si se versiona. `/api/config` solo entrega el bloque `public` al navegador, nunca la password ni el secreto de sesion:
+
+```json
+{
   "public": {
     "site_title": "Granada 2031 | Geolocalizacion del Sentimiento",
     "brand_name": "Granada 2031",
@@ -62,10 +70,11 @@ La administracion esta protegida por backend. Cambia estos valores antes de publ
 }
 ```
 
-El archivo debe estar en:
+Los archivos deben estar en la raiz del proyecto:
 
 ```text
-config.json
+.dev          # secretos, ignorado por git
+config.json   # textos publicos, versionado
 ```
 
 Despues de modificarlo:
@@ -167,7 +176,7 @@ DELETE /api/admin/traces/{id}
 
 `GET /api/traces` solo devuelve contribuciones aprobadas.
 
-Los endpoints `/api/admin/*` requieren login. El frontend obtiene un token temporal con la password definida en `config.json`.
+Los endpoints `/api/admin/*` requieren login. El frontend obtiene un token temporal con la password definida en `.dev`.
 
 ## Acceso a administracion
 

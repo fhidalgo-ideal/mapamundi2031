@@ -25,6 +25,7 @@ DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = BASE_DIR / "uploads"
 DB_PATH = DATA_DIR / "granada2031.sqlite3"
 CONFIG_PATH = BASE_DIR / "config.json"
+SECRETS_PATH = BASE_DIR / ".dev"
 APP_VERSION = "2026-05-07-config-footer"
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 ADMIN_TOKEN_TTL_SECONDS = 12 * 60 * 60
@@ -153,20 +154,29 @@ SEED_TRACES = [
 def ensure_config():
     if CONFIG_PATH.exists():
         return
-    default_config = {
+    default_config = {"public": DEFAULT_PUBLIC_CONFIG}
+    CONFIG_PATH.write_text(json.dumps(default_config, indent=2), encoding="utf-8")
+
+
+def ensure_secrets():
+    if SECRETS_PATH.exists():
+        return
+    default_secrets = {
         "admin_password": "cambia-esta-password",
         "admin_session_secret": uuid.uuid4().hex,
-        "public": DEFAULT_PUBLIC_CONFIG,
     }
-    CONFIG_PATH.write_text(json.dumps(default_config, indent=2), encoding="utf-8")
+    SECRETS_PATH.write_text(json.dumps(default_secrets, indent=2), encoding="utf-8")
 
 
 def load_config():
     ensure_config()
+    ensure_secrets()
     with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
         config = json.load(config_file)
+    with SECRETS_PATH.open("r", encoding="utf-8") as secrets_file:
+        config.update(json.load(secrets_file))
     if not config.get("admin_password") or not config.get("admin_session_secret"):
-        raise RuntimeError("config.json debe definir admin_password y admin_session_secret")
+        raise RuntimeError(".dev debe definir admin_password y admin_session_secret")
     return config
 
 

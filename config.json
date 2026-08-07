@@ -1,6 +1,4 @@
 {
-  "admin_password": "cambia-esta-password",
-  "admin_session_secret": "cambia-tambien-este-secreto-largo",
   "public": {
     "site_title": "Granada 2031 | Geolocalizacion del Sentimiento",
     "brand_name": "Granada 2031",
