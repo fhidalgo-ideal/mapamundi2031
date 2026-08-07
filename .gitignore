@@ -3,3 +3,7 @@ uploads/
 .dev
 __pycache__/
 *.pyc
+
+# Estado local del agente / spec-kit (no se comparte)
+.claude/settings.local.json
+.specify/feature.json
