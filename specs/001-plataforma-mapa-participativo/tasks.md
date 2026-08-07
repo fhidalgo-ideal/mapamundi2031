@@ -21,13 +21,20 @@ dependencias son intra-proyecto.
 
 ## Dependencies (resumen — anula el encadenamiento por defecto entre fases)
 
-- T002 depende de T001.
-- T003, T005, T009, T013, T016 dependen de T002 (Foundational) — **no** de la última tarea de la
-  fase anterior. Cada historia de usuario arranca en paralelo desde T002.
-- T004 depende de T003. T006 y T007 dependen de T005. T008 depende de T006 y T007.
-- T010 depende de T009. T011 depende de T010. T012 depende de T011.
-- T014 es independiente (solo README). T015 depende de T013.
-- T017 depende de T003 (reutiliza el limitador) y de T016. T018 depende de T016 y T017.
+Todo lo que sigue toca `server.py` y/o `tests/smoke_test.py` — un único archivo cada uno. Ramas
+paralelas que editaran la misma función (p. ej. `handle_create_trace`, que crece con T003, T005,
+T006, T007, T009 y T010) chocarían al rebasar sobre `main`, y el routine de merge (ver
+`kb://integrations/auto-work.md`) hace SKIP ante cualquier conflicto real — así que, a diferencia
+de un monorepo con muchos archivos, aquí NO se busca paralelismo entre historias: la cadena es
+lineal, en el mismo orden en que aparecen las tareas en este documento (T001→T002→…→T018), salvo
+T014 (solo `README.md`, sin relación con ningún otro archivo tocado).
+
+- T002 depende de T001. T003 depende de T002. T004 depende de T003.
+- T005 depende de T004. T006 depende de T005. T007 depende de T006. T008 depende de T007.
+- T009 depende de T008. T010 depende de T009. T011 depende de T010. T012 depende de T011.
+- T013 depende de T012. T014 depende solo de T002 (independiente del resto, en paralelo).
+- T015 depende de T013. T016 depende de T015. T017 depende de T016 (reutiliza la estructura del
+  limitador de T003, ya mergeada en este punto de la cadena). T018 depende de T017.
 
 ---
 
@@ -59,8 +66,8 @@ proyecto no tiene ninguna prueba hoy.
   con código 0 en éxito, código distinto de 0 y mensaje claro en fallo. Documentar
   `python3 tests/smoke_test.py` en una nueva sección de `README.md`.
 
-**Checkpoint**: A partir de aquí, US1–US5 pueden avanzar en paralelo; todas dependen de T002, no
-entre sí salvo lo indicado explícitamente.
+**Checkpoint**: A partir de aquí arranca la cadena lineal de US1→US5 (ver el resumen de
+dependencias más arriba); solo T014 puede adelantarse en paralelo.
 
 ---
 
@@ -91,7 +98,7 @@ y sin haberle quitado los metadatos EXIF.
 
 **Independent Test**: Ver spec.md US2.
 
-- [ ] T005 [US2] (depende de T002) Añadir `sniff_image_signature(header_bytes) -> str | None` en
+- [ ] T005 [US2] (depende de T004) Añadir `sniff_image_signature(header_bytes) -> str | None` en
   `server.py`: compara los primeros bytes del archivo subido contra las firmas binarias de
   JPEG (`FF D8`), PNG (`89 50 4E 47`) y WEBP (`RIFF....WEBP`), independientemente del
   `Content-Type`/extensión declarados en `handle_create_trace`; rechaza si no coincide con
@@ -100,10 +107,10 @@ y sin haberle quitado los metadatos EXIF.
   `server.py`: parsea el ancho/alto desde la cabecera SOF de JPEG, `IHDR` de PNG y el chunk
   `VP8`/`VP8L`/`VP8X` de WEBP sin decodificar la imagen completa; rechazar en
   `handle_create_trace` si excede un máximo configurado (p. ej. 6000x6000 px).
-- [ ] T007 [US2] (depende de T005) Añadir `strip_exif(data, kind) -> bytes` en `server.py`:
+- [ ] T007 [US2] (depende de T006) Añadir `strip_exif(data, kind) -> bytes` en `server.py`:
   elimina el segmento `APP1`/EXIF de JPEG, el chunk `eXIf` de PNG y el chunk `EXIF` de WEBP antes
   de escribir el archivo en `uploads/`; no-op seguro si el formato no trae EXIF.
-- [ ] T008 [US2] (depende de T006, T007) Extender `tests/smoke_test.py` con fixtures binarios:
+- [ ] T008 [US2] (depende de T007) Extender `tests/smoke_test.py` con fixtures binarios:
   archivo no-imagen con extensión/`Content-Type` de imagen → rechazado; imagen con dimensiones
   por encima del máximo → rechazada; JPEG de fixture con EXIF GPS conocido → aceptado pero el
   archivo final en `uploads/` ya no contiene ese EXIF.
@@ -119,7 +126,7 @@ páginas legales referenciadas por `config.json` responden con contenido real.
 
 **Independent Test**: Ver spec.md US3.
 
-- [ ] T009 [US3] (depende de T002) En `handle_create_trace` (`server.py`), sustituir el valor fijo
+- [ ] T009 [US3] (depende de T008) En `handle_create_trace` (`server.py`), sustituir el valor fijo
   `"consent": 1` por la lectura real del campo `consent` del formulario (aceptar
   `"true"/"on"/"1"` como verdadero); rechazar la creación con mensaje claro si no es verdadero.
 - [ ] T010 [US3] (depende de T009) Añadir borrado autoservicio: generar un token aleatorio por
@@ -150,7 +157,7 @@ páginas legales referenciadas por `config.json` responden con contenido real.
 
 **Independent Test**: Ver spec.md US4.
 
-- [ ] T013 [US4] (depende de T002) Añadir `send_security_headers(handler)` en `server.py` y
+- [ ] T013 [US4] (depende de T012) Añadir `send_security_headers(handler)` en `server.py` y
   aplicarla desde `json_response`/`error_response` y desde un `end_headers` sobrescrito en
   `GranadaHandler` (cubre también las respuestas estáticas de `SimpleHTTPRequestHandler`, incluida
   `/uploads/<archivo>`): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
@@ -173,15 +180,15 @@ intentos fallidos por IP.
 
 **Independent Test**: Ver spec.md US5.
 
-- [ ] T016 [US5] (depende de T002) Añadir tabla `audit_log` (id, action, trace_id, source_ip,
+- [ ] T016 [US5] (depende de T015) Añadir tabla `audit_log` (id, action, trace_id, source_ip,
   created_at) vía migración idempotente en `init_db()`; insertar una fila desde
   `handle_update_status`, `handle_update_trace` y `handle_delete_trace`, y desde
   `handle_admin_login` (éxito y fallo); añadir `GET /api/admin/audit-log` (protegido con
   `require_admin`) paginado por `created_at` descendente.
-- [ ] T017 [US5] (depende de T003, T016) Aplicar bloqueo por IP a `POST /api/admin/login`
+- [ ] T017 [US5] (depende de T016) Aplicar bloqueo por IP a `POST /api/admin/login`
   reutilizando la estructura del limitador de T003 (contador de fallos por IP, p. ej. máximo 5
   intentos fallidos en 15 minutos → `429` hasta expirar, incluso con contraseña correcta).
-- [ ] T018 [US5] (depende de T016, T017) Extender `tests/smoke_test.py`: una acción de
+- [ ] T018 [US5] (depende de T017) Extender `tests/smoke_test.py`: una acción de
   administración (p. ej. aprobar una contribución) aparece en `GET /api/admin/audit-log`;
   superar el máximo de intentos fallidos de login bloquea intentos posteriores con `429`.
 
@@ -195,16 +202,13 @@ intentos fallidos por IP.
 
 - **Setup (Phase 1)**: sin dependencias, arranca primero.
 - **Foundational (Phase 2)**: depende de Setup — bloquea el arranque de toda historia de usuario.
-- **User Stories (Phase 3-7)**: todas dependen únicamente de Foundational (T002), no entre sí,
-  salvo T017/T018 que además dependen de T003 (US1) por reutilizar su limitador.
+- **User Stories (Phase 3-7)**: forman una cadena lineal única a partir de T002 (ver resumen de
+  dependencias); no se ejecutan en paralelo entre sí porque comparten `server.py`/`smoke_test.py`.
 
-### Parallel Opportunities
+### Ejecución
 
-- Tras T002, US1 (T003), US2 (T005), US3 (T009) y US4 (T013) pueden avanzar en paralelo — tocan
-  secciones distintas de `server.py` y no comparten estado entre sí.
-- US5 (T016) puede empezar en paralelo con las anteriores, pero T017/T018 deben esperar a que
-  T003 (US1) esté mergeada.
-- T014 (solo `README.md`) es paralelizable con cualquier otra tarea.
+Cadena lineal T001→T018 sobre `server.py`/`tests/smoke_test.py` (ver resumen de dependencias);
+único paralelismo real: T014 (`README.md`), independiente de todo lo demás.
 
 ## Notes
 
