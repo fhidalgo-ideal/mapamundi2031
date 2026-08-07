@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Administracion | Granada 2031</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Granada 2031">
+        <span class="brand-mark"></span>
+        <span>
+          <strong>Granada 2031</strong>
+          <small>Administracion protegida</small>
+        </span>
+      </a>
+      <nav aria-label="Navegacion de administracion">
+        <a href="/">Ver mapa publico</a>
+      </nav>
+    </header>
+
+    <main class="admin-page">
+      <section class="admin-section" aria-labelledby="admin-title">
+        <div class="section-heading">
+          <p class="eyebrow">Backend protegido</p>
+          <h1 id="admin-title">Administracion</h1>
+          <p class="admin-intro">Revisa las contribuciones pendientes antes de publicarlas en el mapa.</p>
+        </div>
+        <form class="admin-login" id="adminLoginForm">
+          <label>
+            Password de administracion
+            <input name="password" type="password" autocomplete="current-password" required placeholder="Password definida en config.json">
+          </label>
+          <button class="button primary" type="submit">Entrar</button>
+          <p id="adminStatus" role="status"></p>
+        </form>
+        <div class="admin-layout">
+          <div class="metric">
+            <strong id="pendingCount">0</strong>
+            <span>pendientes</span>
+            <button class="text-button hidden" id="adminLogout" type="button">Cerrar sesion</button>
+          </div>
+          <div class="review-list" id="reviewList"></div>
+        </div>
+      </section>
+    </main>
+
+    <template id="reviewItemTemplate">
+      <article class="review-item">
+          <img alt="">
+          <div>
+          <span class="status-badge"></span>
+          <h3></h3>
+          <p></p>
+          <small></small>
+          <form class="edit-form hidden">
+            <label>Nombre<input name="name" required></label>
+            <label>Email<input name="email" type="email" required></label>
+            <label>Ciudad<input name="city" required></label>
+            <label>Pais<input name="country" required></label>
+            <label>Vinculo<input name="relation" required></label>
+            <label>
+              Emocion
+              <select name="emotion" required>
+                <option value="nostalgia">Nostalgia</option>
+                <option value="pertenencia">Pertenencia</option>
+                <option value="asombro">Asombro</option>
+                <option value="futuro">Futuro</option>
+              </select>
+            </label>
+            <label class="wide">Sentimiento<textarea name="feeling" required></textarea></label>
+            <div class="form-actions wide">
+              <button class="button primary save-edit" type="submit">Guardar</button>
+              <button class="button ghost cancel-edit" type="button">Cancelar</button>
+            </div>
+          </form>
+        </div>
+        <div class="review-actions">
+          <button class="button primary approve" type="button">Aprobar</button>
+          <button class="button danger reject" type="button">Rechazar</button>
+          <button class="button ghost edit" type="button">Editar</button>
+          <button class="button danger delete" type="button">Borrar</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="admin.js?v=20260507-admin-edit-delete"></script>
+  </body>
+</html>

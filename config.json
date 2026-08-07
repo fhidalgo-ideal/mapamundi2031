@@ -1,0 +1,31 @@
+{
+  "admin_password": "cambia-esta-password",
+  "admin_session_secret": "cambia-tambien-este-secreto-largo",
+  "public": {
+    "site_title": "Granada 2031 | Geolocalizacion del Sentimiento",
+    "brand_name": "Granada 2031",
+    "brand_subtitle": "Geolocalizacion del Sentimiento",
+    "brand_logo": "",
+    "brand_logo_alt": "Granada 2031",
+    "hero_eyebrow": "Candidatura cultural participativa",
+    "hero_title": "Granada encendida en el mundo",
+    "hero_text": "Cada foto compartida abre una luz: un recuerdo, una huella o una emocion que conecta a Granada con otra ciudad del planeta.",
+    "submit_cta": "Subir un rastro",
+    "latest_cta": "Ver ultima luz",
+    "map_title": "Mapa vivo",
+    "map_hint": "Rueda para acercar, arrastra para moverte y haz clic en una luz.",
+    "submit_eyebrow": "Nueva contribucion",
+    "submit_title": "Sube tu rastro de Granada",
+    "archive_eyebrow": "Historias publicadas",
+    "archive_title": "Archivo de luces",
+    "consent_text": "Acepto que esta fotografia y el texto se usen en la accion cultural Granada 2031.",
+    "footer_text": "Granada 2031. Geolocalizacion del Sentimiento.",
+    "privacy_label": "Politica de privacidad",
+    "privacy_url": "/politica-de-privacidad",
+    "legal_label": "Aviso legal",
+    "legal_url": "/aviso-legal",
+    "ideal_logo": "",
+    "ideal_logo_alt": "IDEAL",
+    "ideal_url": "https://www.ideal.es"
+  }
+}

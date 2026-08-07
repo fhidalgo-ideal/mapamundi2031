@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Granada 2031 | Geolocalizacion del Sentimiento</title>
+    <link rel="stylesheet" href="styles.css?v=20260507-config-footer">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" id="brandLink" href="#mapa" aria-label="Granada 2031">
+        <span class="brand-mark" id="brandMark"></span>
+        <img class="brand-logo hidden" id="brandLogo" alt="">
+        <span>
+          <strong id="brandName">Granada 2031</strong>
+          <small id="brandSubtitle">Geolocalizacion del Sentimiento</small>
+        </span>
+      </a>
+      <nav aria-label="Navegacion principal">
+        <a href="#mapa">Mapa</a>
+        <a href="#participa">Participa</a>
+        <a href="#archivo">Archivo</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="mapa" aria-labelledby="hero-title">
+        <div class="hero-bg" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <p class="eyebrow" id="heroEyebrow">Candidatura cultural participativa</p>
+          <h1 id="hero-title">Granada encendida en el mundo</h1>
+          <p id="heroText">
+            Cada foto compartida abre una luz: un recuerdo, una huella o una emocion
+            que conecta a Granada con otra ciudad del planeta.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" id="submitCta" href="#participa">Subir un rastro</a>
+            <button class="button ghost" id="focusLatest" type="button">Ver ultima luz</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="map-section" aria-label="Mapa de luces">
+        <div class="map-toolbar">
+          <div>
+            <h2 id="mapTitle">Mapa vivo</h2>
+            <p><span id="approvedCount">0</span> luces aprobadas en <span id="countryCount">0</span> paises</p>
+          </div>
+          <div class="filters" role="group" aria-label="Filtros de emocion">
+            <button class="chip active" type="button" data-filter="all">Todas</button>
+            <button class="chip" type="button" data-filter="nostalgia">Nostalgia</button>
+            <button class="chip" type="button" data-filter="pertenencia">Pertenencia</button>
+            <button class="chip" type="button" data-filter="asombro">Asombro</button>
+            <button class="chip" type="button" data-filter="futuro">Futuro</button>
+          </div>
+        </div>
+
+        <div class="map-shell">
+          <div class="map-controls" aria-label="Controles del mapa">
+            <button class="icon-button map-control" id="zoomIn" type="button" aria-label="Acercar">+</button>
+            <button class="icon-button map-control" id="zoomOut" type="button" aria-label="Alejar">-</button>
+            <button class="icon-button map-control reset" id="zoomReset" type="button" aria-label="Restablecer zoom">1:1</button>
+          </div>
+          <canvas id="worldMap" width="1400" height="760" aria-label="Mapamundi interactivo"></canvas>
+          <div class="map-hint" id="mapHint">Rueda para acercar, arrastra para moverte y haz clic en una luz.</div>
+        </div>
+      </section>
+
+      <section class="submit-section" id="participa" aria-labelledby="submit-title">
+        <div class="section-heading">
+          <p class="eyebrow" id="submitEyebrow">Nueva contribucion</p>
+          <h2 id="submit-title">Sube tu rastro de Granada</h2>
+        </div>
+        <form id="traceForm" class="trace-form">
+          <label>
+            Nombre
+            <input name="name" autocomplete="name" required placeholder="Nombre y apellidos">
+          </label>
+          <label>
+            Email de contacto
+            <input name="email" type="email" autocomplete="email" required placeholder="nombre@email.com">
+          </label>
+          <label>
+            Ciudad
+            <input name="city" list="cityOptions" required placeholder="Ej. Berlin">
+          </label>
+          <label>
+            Pais
+            <input name="country" required placeholder="Ej. Alemania">
+          </label>
+          <label>
+            Vinculo con Granada
+            <select name="relation" required>
+              <option value="">Selecciona una opcion</option>
+              <option>Erasmus en Granada</option>
+              <option>Nacido/a en Granada</option>
+              <option>Visitante</option>
+              <option>Familia o comunidad granadina</option>
+              <option>Artista o investigador/a</option>
+              <option>Otro vinculo cultural</option>
+            </select>
+          </label>
+          <label>
+            Emocion principal
+            <select name="emotion" required>
+              <option value="">Selecciona una emocion</option>
+              <option value="nostalgia">Nostalgia</option>
+              <option value="pertenencia">Pertenencia</option>
+              <option value="asombro">Asombro</option>
+              <option value="futuro">Futuro</option>
+            </select>
+          </label>
+          <label class="wide">
+            Describe el sentimiento
+            <textarea name="feeling" required maxlength="360" placeholder="Cuenta que conecta esta foto con Granada"></textarea>
+          </label>
+          <label class="file-drop wide" id="fileDrop">
+            <input name="photo" type="file" accept="image/*" required>
+            <span>Selecciona una fotografia</span>
+            <small>JPG, PNG o WEBP. En este MVP se almacena en el servidor.</small>
+          </label>
+          <label class="consent wide">
+            <input name="consent" type="checkbox" required>
+            <span id="consentText">Acepto que esta fotografia y el texto se usen en la accion cultural Granada 2031.</span>
+          </label>
+          <div class="form-actions wide">
+            <button class="button primary" type="submit">Enviar a revision</button>
+            <p id="formStatus" role="status"></p>
+          </div>
+        </form>
+        <datalist id="cityOptions">
+          <option value="Granada"></option>
+          <option value="Madrid"></option>
+          <option value="Paris"></option>
+          <option value="Berlin"></option>
+          <option value="Buenos Aires"></option>
+          <option value="Ciudad de Mexico"></option>
+          <option value="Nueva York"></option>
+          <option value="Tokio"></option>
+          <option value="Rabat"></option>
+          <option value="Londres"></option>
+        </datalist>
+      </section>
+
+      <section class="archive-section" id="archivo" aria-labelledby="archive-title">
+        <div class="section-heading">
+          <p class="eyebrow" id="archiveEyebrow">Historias publicadas</p>
+          <h2 id="archive-title">Archivo de luces</h2>
+        </div>
+        <div class="archive-grid" id="archiveGrid"></div>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <p id="footerText">Granada 2031. Geolocalizacion del Sentimiento.</p>
+        <nav class="footer-links" aria-label="Enlaces legales">
+          <a id="privacyLink" href="/politica-de-privacidad">Politica de privacidad</a>
+          <a id="legalLink" href="/aviso-legal">Aviso legal</a>
+        </nav>
+        <a class="footer-logo-link" id="idealLogoLink" href="https://www.ideal.es" aria-label="IDEAL">
+          <img class="footer-logo hidden" id="idealLogo" alt="IDEAL">
+          <span class="footer-logo-fallback" id="idealLogoFallback">IDEAL</span>
+        </a>
+      </div>
+    </footer>
+
+    <article class="story-panel hidden" id="storyPanel" aria-live="polite" role="dialog" aria-modal="true" aria-labelledby="storyTitle">
+      <button class="icon-button" id="closeStory" type="button" aria-label="Cerrar historia">x</button>
+      <img id="storyImage" alt="">
+      <div class="story-body">
+        <span id="storyEmotion" class="emotion"></span>
+        <h3 id="storyTitle"></h3>
+        <p id="storyLocation"></p>
+        <blockquote id="storyFeeling"></blockquote>
+        <dl>
+          <div>
+            <dt>Vinculo</dt>
+            <dd id="storyRelation"></dd>
+          </div>
+          <div>
+            <dt>Fecha</dt>
+            <dd id="storyDate"></dd>
+          </div>
+        </dl>
+        <a id="storyContact" href="#">Contacto</a>
+      </div>
+    </article>
+
+    <template id="archiveCardTemplate">
+      <article class="trace-card">
+        <img alt="">
+        <div>
+          <span class="emotion"></span>
+          <h3></h3>
+          <p></p>
+          <button class="text-button" type="button">Abrir en mapa</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="app.js?v=20260507-config-footer"></script>
+  </body>
+</html>
