@@ -39,6 +39,22 @@ http://localhost:8080
 
 Important: don't open `index.html` by double-clicking it or via a separate static server. Photo uploads need this same application served from `server.ts`, because that's where the API, SQLite, and the `uploads/` folder live.
 
+## Testing
+
+The project has a single test file, `tests/smoke.test.ts`, run with Bun's built-in test runner:
+
+```bash
+bun test
+```
+
+It spawns `server.ts` as a real child process on an OS-assigned ephemeral port, pointed at a
+throwaway temp directory (via `GRANADA_DATA_DIR`, `GRANADA_UPLOAD_DIR`, `GRANADA_DB_PATH`,
+`GRANADA_CONFIG_PATH`, `GRANADA_SECRETS_PATH`), and drives it over HTTP with `fetch`. It never
+touches `data/`, `uploads/`, `config.json`, or `.dev` in the project root. `bun test` exits
+non-zero with a clear failure message if any check fails — no extra flags needed.
+
+Extend `tests/smoke.test.ts` (don't add new test files) as new endpoints or behaviors land.
+
 ## Admin password
 
 Administration is protected server-side. Secrets live in a local `.dev` file that **is not committed to the repository** (it's in `.gitignore`). If it doesn't exist, the server creates it on startup with a random session secret. Change these values before publishing:
