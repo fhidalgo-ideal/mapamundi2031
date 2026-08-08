@@ -34,14 +34,14 @@ const zoomResetButton = document.querySelector("#zoomReset");
 
 async function apiRequest(path, options = {}) {
   if (window.location.protocol === "file:") {
-    throw new Error("Abre el MVP desde el servidor Python, no directamente como archivo. Ejecuta: python3 server.py --host 0.0.0.0 --port 8080");
+    throw new Error("Abre el MVP desde el servidor Bun, no directamente como archivo. Ejecuta: bun run api/server.ts --host 0.0.0.0 --port 8080");
   }
 
   let response;
   try {
     response = await fetch(`${API_BASE}${path}`, options);
   } catch {
-    throw new Error("No hay conexion con la API. Comprueba que server.py esta ejecutandose y abre la URL del servidor, por ejemplo http://localhost:8080.");
+    throw new Error("No hay conexion con la API. Comprueba que api/server.ts esta ejecutandose y abre la URL del servidor, por ejemplo http://localhost:8080.");
   }
 
   const contentType = response.headers.get("content-type") || "";
@@ -49,12 +49,12 @@ async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     if (response.status === 404 && !contentType.includes("application/json")) {
-      throw new Error("La ruta /api/traces devuelve 404 fuera de server.py. Revisa Nginx o arranca la app con: python3 server.py --host 0.0.0.0 --port 8080");
+      throw new Error("La ruta /api/traces devuelve 404 fuera de api/server.ts. Revisa Nginx o arranca la app con: bun run api/server.ts --host 0.0.0.0 --port 8080");
     }
 
     const message = typeof payload === "object" && payload.error
       ? payload.error
-      : `La API no respondio correctamente (${response.status}). Asegurate de abrir la web desde server.py, no desde un servidor estatico.`;
+      : `La API no respondio correctamente (${response.status}). Asegurate de abrir la web desde api/server.ts, no desde un servidor estatico.`;
     throw new Error(message);
   }
 
