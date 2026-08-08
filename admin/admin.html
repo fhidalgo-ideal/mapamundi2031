@@ -35,6 +35,32 @@
           <button class="button primary" type="submit">Entrar</button>
           <p id="adminStatus" role="status"></p>
         </form>
+        <div class="admin-charts hidden" id="adminCharts">
+          <div class="chart-controls">
+            <label>
+              Desde
+              <input type="date" id="chartFrom">
+            </label>
+            <label>
+              Hasta
+              <input type="date" id="chartTo">
+            </label>
+            <div class="chart-toggle" role="group" aria-label="Agrupar por">
+              <button type="button" class="chart-toggle-btn active" data-group="country">Pais</button>
+              <button type="button" class="chart-toggle-btn" data-group="city">Ciudad</button>
+            </div>
+          </div>
+          <div class="chart-grid">
+            <figure class="chart-card">
+              <figcaption>Contribuciones por dia</figcaption>
+              <div class="chart-body" id="chartByDate"></div>
+            </figure>
+            <figure class="chart-card">
+              <figcaption id="chartByPlaceTitle">Contribuciones por pais</figcaption>
+              <div class="chart-body" id="chartByPlace"></div>
+            </figure>
+          </div>
+        </div>
         <div class="admin-layout">
           <div class="metric">
             <strong id="pendingCount">0</strong>
@@ -88,6 +114,6 @@
       </article>
     </template>
 
-    <script src="admin.js?v=20260507-admin-edit-delete"></script>
+    <script src="admin.js?v=20260808-admin-charts"></script>
   </body>
 </html>

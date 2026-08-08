@@ -8,6 +8,15 @@ const adminStatus = document.querySelector("#adminStatus");
 const adminLogout = document.querySelector("#adminLogout");
 const reviewList = document.querySelector("#reviewList");
 const pendingCount = document.querySelector("#pendingCount");
+const adminCharts = document.querySelector("#adminCharts");
+const chartFrom = document.querySelector("#chartFrom");
+const chartTo = document.querySelector("#chartTo");
+const chartByDate = document.querySelector("#chartByDate");
+const chartByPlace = document.querySelector("#chartByPlace");
+const chartByPlaceTitle = document.querySelector("#chartByPlaceTitle");
+const chartToggleButtons = document.querySelectorAll(".chart-toggle-btn");
+let chartGroupBy = "country";
+let chartDefaultsSet = false;
 
 async function apiRequest(path, options = {}) {
   let response;
@@ -51,6 +60,163 @@ function renderAdmin() {
   adminLoginForm.classList.toggle("hidden", Boolean(adminToken));
   adminLogout.classList.toggle("hidden", !adminToken);
   renderReviewList();
+  renderCharts();
+}
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function toDateInputValue(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function toDateKey(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return toDateInputValue(date);
+}
+
+function escapeXml(value) {
+  return String(value).replace(/[&<>"]/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+  })[char]);
+}
+
+function truncateLabel(value, max) {
+  return value.length > max ? `${value.slice(0, max - 1)}\u2026` : value;
+}
+
+function enumerateDays(from, to) {
+  const days = [];
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return days;
+  }
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    days.push(toDateInputValue(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
+
+function setChartDefaults() {
+  if (chartDefaultsSet) return;
+  const today = new Date();
+  const start = new Date();
+  start.setDate(today.getDate() - 29);
+  chartTo.value = toDateInputValue(today);
+  chartFrom.value = toDateInputValue(start);
+  chartDefaultsSet = true;
+}
+
+function renderCharts() {
+  if (!adminToken) {
+    adminCharts.classList.add("hidden");
+    return;
+  }
+  adminCharts.classList.remove("hidden");
+  setChartDefaults();
+
+  const from = chartFrom.value;
+  const to = chartTo.value;
+  const inRange = adminTraces.filter((trace) => {
+    const key = toDateKey(trace.createdAt);
+    if (!key) return false;
+    if (from && key < from) return false;
+    if (to && key > to) return false;
+    return true;
+  });
+
+  renderDateChart(inRange, from, to);
+  renderPlaceChart(inRange);
+}
+
+function renderDateChart(traces, from, to) {
+  const counts = new Map();
+  traces.forEach((trace) => {
+    const key = toDateKey(trace.createdAt);
+    if (key) counts.set(key, (counts.get(key) || 0) + 1);
+  });
+
+  let days = enumerateDays(from, to);
+  if (days.length === 0) days = [...counts.keys()].sort();
+  if (days.length === 0) {
+    chartByDate.innerHTML = `<p class="chart-empty">Sin datos en este rango.</p>`;
+    return;
+  }
+
+  const values = days.map((day) => counts.get(day) || 0);
+  const maxValue = Math.max(1, ...values);
+  const colW = 26;
+  const chartH = 150;
+  const topPad = 16;
+  const axisH = 30;
+  const width = days.length * colW;
+  const height = chartH + topPad + axisH;
+  const labelEvery = Math.ceil(days.length / 8);
+
+  const bars = days.map((day, index) => {
+    const value = values[index];
+    const barH = value > 0 ? Math.max((value / maxValue) * chartH, 2) : 0;
+    const x = index * colW;
+    const y = topPad + (chartH - barH);
+    const [, mm, dd] = day.split("-");
+    const axisLabel = index % labelEvery === 0 || index === days.length - 1
+      ? `<text class="chart-axis-label" x="${x + colW / 2}" y="${topPad + chartH + 18}" text-anchor="middle">${dd}/${mm}</text>`
+      : "";
+    const valueLabel = value > 0
+      ? `<text class="chart-bar-value" x="${x + colW / 2}" y="${y - 4}" text-anchor="middle">${value}</text>`
+      : "";
+    return `<g><rect class="chart-bar" x="${x + 3}" y="${y}" width="${colW - 6}" height="${barH}" rx="2"><title>${dd}/${mm}: ${value}</title></rect>${valueLabel}${axisLabel}</g>`;
+  }).join("");
+
+  chartByDate.innerHTML = `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Contribuciones por dia">${bars}</svg>`;
+}
+
+function renderPlaceChart(traces) {
+  const counts = new Map();
+  traces.forEach((trace) => {
+    const raw = (trace[chartGroupBy] || "").trim();
+    const key = raw || "Sin especificar";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+
+  const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  if (entries.length === 0) {
+    chartByPlace.innerHTML = `<p class="chart-empty">Sin datos en este rango.</p>`;
+    return;
+  }
+
+  const maxValue = Math.max(1, ...entries.map((entry) => entry[1]));
+  const rowH = 24;
+  const gap = 8;
+  const labelW = 110;
+  const countW = 26;
+  const width = 360;
+  const barArea = width - labelW - countW;
+  const height = entries.length * (rowH + gap);
+
+  const rows = entries.map((entry, index) => {
+    const [label, value] = entry;
+    const barW = Math.max((value / maxValue) * barArea, 2);
+    const y = index * (rowH + gap);
+    const full = escapeXml(label);
+    const display = escapeXml(truncateLabel(label, 16));
+    return `<g>`
+      + `<text class="chart-hbar-label" x="0" y="${y + rowH / 2}" dominant-baseline="middle">${display}<title>${full}</title></text>`
+      + `<rect class="chart-hbar" x="${labelW}" y="${y + 2}" width="${barW}" height="${rowH - 4}" rx="3"><title>${full}: ${value}</title></rect>`
+      + `<text class="chart-hbar-value" x="${labelW + barW + 6}" y="${y + rowH / 2}" dominant-baseline="middle">${value}</text>`
+      + `</g>`;
+  }).join("");
+
+  const groupLabel = chartGroupBy === "country" ? "pais" : "ciudad";
+  chartByPlace.innerHTML = `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Contribuciones por ${groupLabel}">${rows}</svg>`;
 }
 
 function renderReviewList() {
@@ -196,6 +362,19 @@ adminLogout.addEventListener("click", () => {
   sessionStorage.removeItem("granada2031.adminToken");
   adminStatus.textContent = "Sesion cerrada.";
   renderAdmin();
+});
+
+chartFrom.addEventListener("change", renderCharts);
+chartTo.addEventListener("change", renderCharts);
+chartToggleButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    chartGroupBy = button.dataset.group;
+    chartToggleButtons.forEach((other) => other.classList.toggle("active", other === button));
+    chartByPlaceTitle.textContent = chartGroupBy === "country"
+      ? "Contribuciones por pais"
+      : "Contribuciones por ciudad";
+    renderCharts();
+  });
 });
 
 loadAdminTraces().catch((error) => {

@@ -873,8 +873,8 @@ function handleGetTraces(): Response {
 function handleGetAdminTraces(): Response {
   const rows = db
     .query(
-      `SELECT * FROM traces WHERE status IN ('pending', 'approved')
-       ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, datetime(created_at) DESC`,
+      `SELECT * FROM traces
+       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, datetime(created_at) DESC`,
     )
     .all() as TraceRow[];
   return jsonResponse({ traces: rows.map(rowToTrace) });

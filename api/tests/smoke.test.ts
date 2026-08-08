@@ -244,6 +244,54 @@ describe("smoke", () => {
     expect(approved?.status).toBe("approved");
   });
 
+  test("GET /api/admin/traces includes rejected contributions", async () => {
+    // ADMIN01: charts and ADMIN03 filtering need every status visible to the
+    // admin, so a rejected trace must NOT be hidden by the endpoint anymore.
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const form = new FormData();
+    form.set("name", "Rejected Test");
+    form.set("email", "rejected@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Contribucion que sera rechazada.");
+    form.set("consent", "true");
+    form.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const createResponse = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.61" },
+      body: form,
+    });
+    expect(createResponse.status).toBe(201);
+    const rejectedId = (await createResponse.json()).trace.id as string;
+
+    const rejectResponse = await fetch(`${baseUrl}/api/admin/traces/${rejectedId}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ status: "rejected" }),
+    });
+    expect(rejectResponse.status).toBe(200);
+
+    const adminResponse = await fetch(`${baseUrl}/api/admin/traces`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(adminResponse.status).toBe(200);
+    const adminBody = await adminResponse.json();
+    const rejected = adminBody.traces.find((trace: { id: string }) => trace.id === rejectedId);
+    expect(rejected?.status).toBe("rejected");
+
+    // ...and it stays hidden from the public map.
+    const publicResponse = await fetch(`${baseUrl}/api/traces`);
+    const publicBody = await publicResponse.json();
+    const publicIds = publicBody.traces.map((trace: { id: string }) => trace.id);
+    expect(publicIds).not.toContain(rejectedId);
+  });
+
   test("GET /api/traces now shows the approved contribution publicly", async () => {
     const response = await fetch(`${baseUrl}/api/traces`);
     expect(response.status).toBe(200);
