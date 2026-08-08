@@ -756,4 +756,59 @@ describe("smoke", () => {
     expect(lockedResponse.status).toBe(429);
     expect(lockedResponse.headers.get("Retry-After")).toBeTruthy();
   });
+
+  test("POST /api/notify-signup stores a valid email and returns 201", async () => {
+    const response = await fetch(`${baseUrl}/api/notify-signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Forwarded-For": "203.0.113.120",
+      },
+      body: JSON.stringify({ email: "suscriptor@example.com" }),
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+  });
+
+  test("POST /api/notify-signup rejects an invalid email with 400", async () => {
+    const response = await fetch(`${baseUrl}/api/notify-signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Forwarded-For": "203.0.113.121",
+      },
+      body: JSON.stringify({ email: "no-es-un-correo" }),
+    });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBeTruthy();
+  });
+
+  test("POST /api/notify-signup exceeds rate limit and returns 429 after max hits", async () => {
+    const clientIp = "203.0.113.122";
+    const baseHeaders = {
+      "Content-Type": "application/json",
+      "X-Forwarded-For": clientIp,
+    };
+
+    // 5 signups (at limit) all succeed with 201.
+    for (let i = 1; i <= 5; i++) {
+      const response = await fetch(`${baseUrl}/api/notify-signup`, {
+        method: "POST",
+        headers: baseHeaders,
+        body: JSON.stringify({ email: `ratelimit${i}@example.com` }),
+      });
+      expect(response.status).toBe(201);
+    }
+
+    // 6th signup from the same IP is rejected with 429.
+    const response = await fetch(`${baseUrl}/api/notify-signup`, {
+      method: "POST",
+      headers: baseHeaders,
+      body: JSON.stringify({ email: "ratelimit6@example.com" }),
+    });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBeTruthy();
+  });
 });

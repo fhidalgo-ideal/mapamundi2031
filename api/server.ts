@@ -24,6 +24,10 @@ const TRACE_RATE_LIMIT_MAX = Number(process.env.GRANADA_TRACE_RATE_LIMIT_MAX ?? 
 const TRACE_RATE_LIMIT_WINDOW_MS = Number(
   process.env.GRANADA_TRACE_RATE_LIMIT_WINDOW_MS ?? 60 * 60 * 1000,
 );
+const NOTIFY_SIGNUP_RATE_LIMIT_MAX = Number(process.env.GRANADA_NOTIFY_SIGNUP_RATE_LIMIT_MAX ?? 5);
+const NOTIFY_SIGNUP_RATE_LIMIT_WINDOW_MS = Number(
+  process.env.GRANADA_NOTIFY_SIGNUP_RATE_LIMIT_WINDOW_MS ?? 60 * 60 * 1000,
+);
 const ADMIN_LOGIN_LOCKOUT_MAX = Number(process.env.GRANADA_ADMIN_LOGIN_LOCKOUT_MAX ?? 5);
 const ADMIN_LOGIN_LOCKOUT_WINDOW_MS = Number(
   process.env.GRANADA_ADMIN_LOGIN_LOCKOUT_WINDOW_MS ?? 15 * 60 * 1000,
@@ -271,6 +275,13 @@ function initDb() {
       action TEXT NOT NULL,
       trace_id TEXT,
       source_ip TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notify_signups (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL
     )
   `);
@@ -893,6 +904,10 @@ function createRateLimiter(maxHits: number, windowMs: number) {
 }
 
 const checkTraceRateLimit = createRateLimiter(TRACE_RATE_LIMIT_MAX, TRACE_RATE_LIMIT_WINDOW_MS);
+const checkNotifySignupRateLimit = createRateLimiter(
+  NOTIFY_SIGNUP_RATE_LIMIT_MAX,
+  NOTIFY_SIGNUP_RATE_LIMIT_WINDOW_MS,
+);
 
 function createFailureLockout(maxFailures: number, windowMs: number) {
   const failuresByKey = new Map<string, number[]>();
@@ -1071,6 +1086,48 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   });
 
   return jsonResponse({ trace: rowToTrace(trace as unknown as TraceRow), deletionToken }, 201);
+}
+
+// Loose "looks like an email" check: one @, no whitespace, a dotted domain.
+// Deliberately not RFC-5322-exhaustive — the endpoint only captures addresses
+// for a future notification, so a permissive-but-sane guard is enough.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Capture-only newsletter signup: stores an email so the owner can later be
+// told when their photo is published. No email is sent from here — delivery
+// is out of scope (no provider configured). Rate-limited per IP like the
+// other public write endpoint.
+async function handleNotifySignup(request: Request, server?: IpResolvingServer): Promise<Response> {
+  const clientIp = getClientIp(request, server);
+  const rateLimit = checkNotifySignupRateLimit(clientIp);
+  if (rateLimit.limited) {
+    const response = errorResponse(
+      "Demasiadas suscripciones desde esta conexion. Intentalo mas tarde.",
+      429,
+    );
+    response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
+    return response;
+  }
+
+  let payload: { email?: unknown };
+  try {
+    payload = await request.json();
+  } catch {
+    return errorResponse("La peticion no contiene un cuerpo JSON valido.");
+  }
+
+  const email = typeof payload.email === "string" ? payload.email.trim() : "";
+  if (!email || email.length > 180 || !EMAIL_PATTERN.test(email)) {
+    return errorResponse("Introduce un correo electronico valido.");
+  }
+
+  // Idempotent capture: a repeated address is silently accepted (INSERT OR
+  // IGNORE against the UNIQUE email column) so re-submitting still returns 201.
+  db.prepare(
+    "INSERT OR IGNORE INTO notify_signups (id, email, created_at) VALUES ($id, $email, $created_at)",
+  ).run({ $id: randomUUID(), $email: email.toLowerCase(), $created_at: nowIso() });
+
+  return jsonResponse({ ok: true }, 201);
 }
 
 async function handleUpdateStatus(request: Request, traceId: string, server?: IpResolvingServer): Promise<Response> {
@@ -1350,6 +1407,9 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
     }
     if (normalizedPath === "/api/traces") {
       return handleCreateTrace(request, server);
+    }
+    if (normalizedPath === "/api/notify-signup") {
+      return handleNotifySignup(request, server);
     }
     if (path.startsWith("/api/")) {
       return errorResponse("Endpoint de API no encontrado.", 404);

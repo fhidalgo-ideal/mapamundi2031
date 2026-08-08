@@ -311,6 +311,104 @@ h1 {
   letter-spacing: -0.01em;
 }
 
+.newsletter-banner {
+  background: var(--bg-dark);
+  padding: 72px clamp(18px, 4vw, 56px);
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.newsletter-inner {
+  max-width: 720px;
+  width: 100%;
+}
+
+.newsletter-title {
+  color: var(--ink-on-dark);
+  font-size: clamp(24px, 4vw, 40px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 0 0 32px;
+}
+
+.newsletter-form {
+  margin: 0;
+}
+
+.newsletter-control {
+  align-items: center;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  display: flex;
+  margin: 0 auto;
+  max-width: 480px;
+  padding: 6px;
+}
+
+.newsletter-input {
+  background: transparent;
+  border: 0;
+  color: var(--ink-on-light);
+  flex: 1;
+  font-size: 16px;
+  min-height: 44px;
+  outline: none;
+  padding: 0 18px;
+}
+
+.newsletter-input::placeholder {
+  color: var(--muted-on-light);
+}
+
+.newsletter-submit {
+  background: var(--coral);
+  border: 0;
+  border-radius: 999px;
+  color: var(--bg-light);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0 24px;
+  white-space: nowrap;
+}
+
+.newsletter-submit:hover {
+  filter: brightness(0.94);
+}
+
+.newsletter-status {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 16px 0 0;
+  min-height: 20px;
+}
+
+.newsletter-status.error {
+  color: var(--coral);
+}
+
+.newsletter-status.success {
+  color: var(--green);
+}
+
+@media (max-width: 520px) {
+  .newsletter-control {
+    border-radius: 20px;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .newsletter-submit {
+    width: 100%;
+  }
+}
+
 .admin-page {
   padding-top: 92px;
 }

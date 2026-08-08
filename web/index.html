@@ -225,6 +225,20 @@
 
     </main>
 
+    <section class="newsletter-banner" aria-labelledby="newsletter-title">
+      <div class="newsletter-inner">
+        <h2 class="newsletter-title" id="newsletter-title">Enterate cuando tu foto se publique en el mapa</h2>
+        <form class="newsletter-form" id="newsletterForm" novalidate>
+          <div class="newsletter-control">
+            <input class="newsletter-input" id="newsletterEmail" name="email" type="email"
+              required autocomplete="email" placeholder="tu@correo.com" aria-label="Tu correo electronico">
+            <button class="newsletter-submit" type="submit">Avisadme</button>
+          </div>
+          <p class="newsletter-status" id="newsletterStatus" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
     <footer class="site-footer">
       <div class="footer-inner">
         <p id="footerText">Granada 2031. Geolocalizacion del Sentimiento.</p>
