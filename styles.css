@@ -493,6 +493,17 @@ textarea {
   margin-top: 4px;
 }
 
+.hp-field {
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  width: 1px;
+  white-space: nowrap;
+  left: -10000px;
+}
+
 .archive-grid {
   display: grid;
   gap: 16px;

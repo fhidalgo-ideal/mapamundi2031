@@ -13,6 +13,10 @@ const SECRETS_PATH = process.env.GRANADA_SECRETS_PATH ?? join(BASE_DIR, ".dev");
 const APP_VERSION = "2026-05-07-config-footer";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const ADMIN_TOKEN_TTL_SECONDS = 12 * 60 * 60;
+const TRACE_RATE_LIMIT_MAX = Number(process.env.GRANADA_TRACE_RATE_LIMIT_MAX ?? 5);
+const TRACE_RATE_LIMIT_WINDOW_MS = Number(
+  process.env.GRANADA_TRACE_RATE_LIMIT_WINDOW_MS ?? 60 * 60 * 1000,
+);
 const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -421,7 +425,66 @@ async function handleAdminLogin(request: Request): Promise<Response> {
   return jsonResponse({ token: makeAdminToken(), expiresIn: ADMIN_TOKEN_TTL_SECONDS });
 }
 
-async function handleCreateTrace(request: Request): Promise<Response> {
+interface IpResolvingServer {
+  requestIP(request: Request): { address: string } | null;
+}
+
+const TRUSTED_PROXY_ADDRESSES: Record<string, true> = { "127.0.0.1": true, "::1": true };
+
+// Trust X-Forwarded-For only when the direct socket peer is a local/trusted
+// proxy (e.g. an nginx reverse proxy on the same host forwarding over
+// loopback); otherwise a direct, untrusted client could spoof the header
+// and get a fresh rate-limit bucket on every request.
+function getClientIp(request: Request, server?: IpResolvingServer): string {
+  const remoteAddress = server?.requestIP(request)?.address ?? null;
+  if (remoteAddress && TRUSTED_PROXY_ADDRESSES[remoteAddress]) {
+    const forwardedFor = request.headers.get("X-Forwarded-For");
+    if (forwardedFor) {
+      const candidate = forwardedFor.split(",")[0]?.trim();
+      if (candidate) return candidate;
+    }
+  }
+  return remoteAddress ?? "unknown";
+}
+
+interface RateLimitResult {
+  limited: boolean;
+  retryAfterSeconds: number;
+}
+
+function createRateLimiter(maxHits: number, windowMs: number) {
+  const hitsByKey = new Map<string, number[]>();
+  return function check(key: string): RateLimitResult {
+    const now = Date.now();
+    const windowStart = now - windowMs;
+    const recentHits = (hitsByKey.get(key) ?? []).filter((timestamp) => timestamp > windowStart);
+    if (recentHits.length >= maxHits) {
+      hitsByKey.set(key, recentHits);
+      const retryAfterMs = recentHits[0] + windowMs - now;
+      return { limited: true, retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)) };
+    }
+    recentHits.push(now);
+    hitsByKey.set(key, recentHits);
+    return { limited: false, retryAfterSeconds: 0 };
+  };
+}
+
+const checkTraceRateLimit = createRateLimiter(TRACE_RATE_LIMIT_MAX, TRACE_RATE_LIMIT_WINDOW_MS);
+
+const GENERIC_SUBMISSION_ERROR = "No se ha podido procesar tu contribucion. Intentalo de nuevo mas tarde.";
+
+async function handleCreateTrace(request: Request, server?: IpResolvingServer): Promise<Response> {
+  const clientIp = getClientIp(request, server);
+  const rateLimit = checkTraceRateLimit(clientIp);
+  if (rateLimit.limited) {
+    const response = errorResponse(
+      "Demasiadas contribuciones enviadas desde esta conexion. Intentalo mas tarde.",
+      429,
+    );
+    response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
+    return response;
+  }
+
   const contentLength = Number(request.headers.get("Content-Length") ?? "0");
   if (contentLength > MAX_UPLOAD_BYTES) {
     return errorResponse("La fotografia supera el limite de 8 MB.", 413);
@@ -436,6 +499,11 @@ async function handleCreateTrace(request: Request): Promise<Response> {
     form = await request.formData();
   } catch {
     return errorResponse("La peticion no contiene datos.");
+  }
+
+  const honeypot = String(form.get("website") ?? "").trim();
+  if (honeypot) {
+    return errorResponse(GENERIC_SUBMISSION_ERROR);
   }
 
   const requiredFields = ["name", "email", "city", "country", "relation", "emotion", "feeling", "consent"];
@@ -682,7 +750,7 @@ async function serveStatic(pathname: string): Promise<Response> {
   return new Response(file);
 }
 
-async function handleRequest(request: Request): Promise<Response> {
+async function handleRequest(request: Request, server?: IpResolvingServer): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const normalizedPath = path.replace(/\/+$/, "") || "/";
@@ -732,7 +800,7 @@ async function handleRequest(request: Request): Promise<Response> {
       return handleAdminLogin(request);
     }
     if (normalizedPath === "/api/traces") {
-      return handleCreateTrace(request);
+      return handleCreateTrace(request, server);
     }
     if (path.startsWith("/api/")) {
       return errorResponse("Endpoint de API no encontrado.", 404);
