@@ -653,13 +653,12 @@ textarea {
 
 .archive-grid {
   display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0 auto;
   max-width: 1280px;
 }
 
-.trace-card,
 .review-item,
 .metric {
   background: var(--surface);
@@ -669,20 +668,47 @@ textarea {
 }
 
 .trace-card {
-  overflow: hidden;
+  background: #fffdf8;
+  border: 1px solid var(--line-light);
+  border-radius: 4px;
+  box-shadow: 0 14px 32px rgba(26, 26, 26, 0.16);
+  padding: 12px 12px 16px;
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.trace-card:hover,
+.trace-card:focus-within {
+  box-shadow: 0 22px 48px rgba(26, 26, 26, 0.24);
+  transform: rotate(0deg);
+  z-index: 2;
 }
 
 .trace-card img {
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 1 / 1;
+  border-radius: 2px;
   object-fit: cover;
   width: 100%;
 }
 
 .trace-card div {
-  padding: 16px;
+  padding: 12px 4px 0;
 }
 
-.trace-card p,
+.trace-card h3 {
+  color: var(--ink-on-light);
+  font-size: 17px;
+}
+
+.trace-card p {
+  color: var(--muted-on-light);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
 .review-item p {
   color: var(--muted);
   line-height: 1.5;
@@ -693,6 +719,47 @@ textarea {
   color: var(--gold);
   font-weight: 800;
   padding: 0;
+}
+
+.trace-card .text-button {
+  color: var(--coral);
+}
+
+.trace-card .emotion.nostalgia {
+  background: rgba(242, 109, 91, 0.14);
+  color: #b23a2c;
+}
+
+.trace-card .emotion.pertenencia {
+  background: rgba(124, 138, 90, 0.16);
+  color: #4c5a2f;
+}
+
+.trace-card .emotion.asombro {
+  background: rgba(103, 215, 196, 0.2);
+  color: #16766a;
+}
+
+.trace-card .emotion.futuro {
+  background: rgba(184, 150, 255, 0.22);
+  color: #6a4bc9;
+}
+
+.archive-actions {
+  display: flex;
+  justify-content: center;
+  margin: 32px auto 0;
+  max-width: 1280px;
+}
+
+.button.outline {
+  background: transparent;
+  border: 1.5px solid var(--ink-on-light);
+  color: var(--ink-on-light);
+}
+
+.button.outline:hover {
+  background: rgba(26, 26, 26, 0.06);
 }
 
 .admin-layout {
@@ -909,10 +976,14 @@ textarea {
   }
 
   .trace-form,
-  .archive-grid,
   .admin-layout,
   .admin-login {
     grid-template-columns: 1fr;
+  }
+
+  .archive-grid {
+    gap: 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .review-item {
@@ -949,6 +1020,11 @@ textarea {
   .admin-section {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .archive-grid {
+    gap: 20px;
+    grid-template-columns: 1fr;
   }
 
   .map-shell {

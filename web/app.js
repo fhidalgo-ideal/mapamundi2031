@@ -8,8 +8,10 @@ const emotionLabels = {
 };
 
 const mapPointColor = "#f7a94a";
+const ARCHIVE_BATCH_SIZE = 8;
 
 let traces = [];
+let archiveVisibleCount = ARCHIVE_BATCH_SIZE;
 let activeFilter = "all";
 let selectedTraceId = null;
 let animationFrame;
@@ -24,6 +26,7 @@ const canvas = document.querySelector("#worldMap");
 const ctx = canvas.getContext("2d");
 const form = document.querySelector("#traceForm");
 const archiveGrid = document.querySelector("#archiveGrid");
+const archiveLoadMoreButton = document.querySelector("#archiveLoadMore");
 const storyPanel = document.querySelector("#storyPanel");
 const zoomInButton = document.querySelector("#zoomIn");
 const zoomOutButton = document.querySelector("#zoomOut");
@@ -501,6 +504,14 @@ function renderHeroPolaroids() {
   });
 }
 
+const POLAROID_TILT_MAGNITUDES = [1.5, 3, 2, 2.75, 1.75, 2.25];
+
+function polaroidTilt(index) {
+  const direction = index % 2 === 0 ? -1 : 1;
+  const magnitude = POLAROID_TILT_MAGNITUDES[index % POLAROID_TILT_MAGNITUDES.length];
+  return direction * magnitude;
+}
+
 function renderArchive() {
   archiveGrid.innerHTML = "";
   const template = document.querySelector("#archiveCardTemplate");
@@ -508,10 +519,11 @@ function renderArchive() {
 
   if (approved.length === 0) {
     archiveGrid.innerHTML = `<p class="empty-state">Todavia no hay luces aprobadas.</p>`;
+    archiveLoadMoreButton.classList.add("hidden");
     return;
   }
 
-  approved.forEach((trace) => {
+  approved.slice(0, archiveVisibleCount).forEach((trace, index) => {
     const node = template.content.cloneNode(true);
     const article = node.querySelector("article");
     const img = node.querySelector("img");
@@ -521,13 +533,21 @@ function renderArchive() {
     node.querySelector(".emotion").className = `emotion ${trace.emotion}`;
     node.querySelector("h3").textContent = `${trace.city}, ${trace.country}`;
     node.querySelector("p").textContent = trace.feeling;
+    article.style.setProperty("--tilt", `${polaroidTilt(index)}deg`);
     node.querySelector("button").addEventListener("click", () => {
       document.querySelector("#mapa").scrollIntoView({ behavior: "smooth" });
       openStory(trace);
     });
-    archiveGrid.appendChild(article);
+    archiveGrid.appendChild(node);
   });
+
+  archiveLoadMoreButton.classList.toggle("hidden", archiveVisibleCount >= approved.length);
 }
+
+archiveLoadMoreButton.addEventListener("click", () => {
+  archiveVisibleCount += ARCHIVE_BATCH_SIZE;
+  renderArchive();
+});
 
 function renderAll() {
   renderStats();
