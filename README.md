@@ -2,7 +2,7 @@
 
 Navigable MVP with server-side storage for the "Geolocalizacion del Sentimiento" campaign.
 
-The public map supports mouse-wheel zoom, `+`/`-` controls, view reset, and drag panning across regions with a high concentration of photos.
+The public map supports mouse-wheel zoom, `+`/`-` controls, view reset, and drag panning across regions with a high concentration of photos. The public site's visual design follows a reference provided by the project owner.
 
 ## Storage
 
