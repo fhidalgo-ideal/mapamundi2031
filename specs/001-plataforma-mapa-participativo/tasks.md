@@ -64,7 +64,7 @@ today.
 
 **⚠️ CRITICAL**: No user story is considered verified without extending this smoke test.
 
-- [ ] T002 Create `tests/smoke.test.ts` (depends on T001): a `bun test` file that spawns
+- [x] T002 Create `tests/smoke.test.ts` (depends on T001): a `bun test` file that spawns
   `server.ts` on an ephemeral port via `Bun.spawn`, with the env vars from T001 pointing at a
   directory created with `fs.mkdtempSync(join(tmpdir(), "granada-smoke-"))`, and drives it with
   `fetch`. Covers the current happy path: `GET /api/health`, `GET /api/config`,
@@ -85,13 +85,13 @@ T014 can run ahead in parallel.
 
 **Independent Test**: See spec.md US1.
 
-- [ ] T003 [US1] Add a per-IP rate limiter to `POST /api/traces` in `server.ts`: an in-memory
+- [x] T003 [US1] Add a per-IP rate limiter to `POST /api/traces` in `server.ts`: an in-memory
   structure (`Map<ip, timestamp[]>`, configurable sliding window, e.g. 5 submissions/hour per IP
   using the request's remote address with a fallback to the `X-Forwarded-For` header when
   present), and a hidden honeypot field (`website`) in `index.html`/`app.js` that, if filled in,
   is rejected with the same generic error message without creating a record. When the limit is
   exceeded, respond `429` with a `Retry-After` header.
-- [ ] T004 [US1] (depends on T003) Extend `tests/smoke.test.ts`: send more contributions than the
+- [x] T004 [US1] (depends on T003) Extend `tests/smoke.test.ts`: send more contributions than the
   configured limit from the same simulated IP and expect `429` starting from the one that exceeds
   it; submit the form with the honeypot filled in and expect rejection with no record created.
 
@@ -106,19 +106,19 @@ having its EXIF metadata stripped.
 
 **Independent Test**: See spec.md US2.
 
-- [ ] T005 [US2] (depends on T004) Add `sniffImageSignature(headerBytes: Uint8Array): string |
+- [x] T005 [US2] (depends on T004) Add `sniffImageSignature(headerBytes: Uint8Array): string |
   null` in `server.ts`: compares the first bytes of the uploaded file against the binary
   signatures for JPEG (`FF D8`), PNG (`89 50 4E 47`), and WEBP (`RIFF....WEBP`), independently of
   the `Content-Type`/extension declared in `handleCreateTrace`; rejects if it matches none of the
   supported signatures.
-- [X] T006 [US2] (depends on T005) Add `readImageDimensions(data: Uint8Array, kind: string):
+- [x] T006 [US2] (depends on T005) Add `readImageDimensions(data: Uint8Array, kind: string):
   [number, number]` in `server.ts`: parses width/height from the JPEG SOF header, PNG `IHDR`
   chunk, and WEBP `VP8`/`VP8L`/`VP8X` chunk without decoding the full image; reject in
   `handleCreateTrace` if it exceeds a configured maximum (e.g. 6000x6000 px).
-- [X] T007 [US2] (depends on T006) Add `stripExif(data: Uint8Array, kind: string): Uint8Array` in
+- [x] T007 [US2] (depends on T006) Add `stripExif(data: Uint8Array, kind: string): Uint8Array` in
   `server.ts`: removes the JPEG `APP1`/EXIF segment, the PNG `eXIf` chunk, and the WEBP `EXIF`
   chunk before writing the file to `uploads/`; safe no-op if the format carries no EXIF.
-- [X] T008 [US2] (depends on T007) Extend `tests/smoke.test.ts` with binary fixtures: a
+- [x] T008 [US2] (depends on T007) Extend `tests/smoke.test.ts` with binary fixtures: a
   non-image file with an image extension/`Content-Type` → rejected; an image with dimensions
   above the maximum → rejected; a fixture JPEG with known GPS EXIF → accepted, but the final file
   in `uploads/` no longer contains that EXIF.
@@ -134,23 +134,23 @@ referenced by `config.json` respond with real content.
 
 **Independent Test**: See spec.md US3.
 
-- [X] T009 [US3] (depends on T008) In `handleCreateTrace` (`server.ts`), replace the hardcoded
+- [x] T009 [US3] (depends on T008) In `handleCreateTrace` (`server.ts`), replace the hardcoded
   `consent: 1` with the actual `consent` field from the form (accept `"true"/"on"/"1"` as truthy);
   reject creation with a clear message if it isn't truthy.
-- [X] T010 [US3] (depends on T009) Add self-service deletion: generate a random token per
+- [x] T010 [US3] (depends on T009) Add self-service deletion: generate a random token per
   contribution in `handleCreateTrace`, return it once in the `POST /api/traces` response, store
   only its hash (`deletion_token_hash`, a new column on `traces` via an idempotent migration in
   `initDb()`); add a public `DELETE /api/traces/{id}` (no `requireAdmin`) that deletes the record
   + photo only if the `X-Deletion-Token` header matches (compared with `timingSafeEqual`),
   returning `403` if it doesn't match.
-- [ ] T011 [US3] (depends on T010) Create `politica-de-privacidad.html` and `aviso-legal.html`
+- [x] T011 [US3] (depends on T010) Create `politica-de-privacidad.html` and `aviso-legal.html`
   with real content (GDPR: what data is collected, legal basis, retention period, how to exercise
   the right to erasure with the T010 token, contact details), served by `server.ts` at
   `/politica-de-privacidad` and `/aviso-legal` (routes already linked from `config.json` via
   `privacy_url`/`legal_url`, but currently 404); add default legal-text keys to
   `DEFAULT_PUBLIC_CONFIG` in `server.ts` and show the deletion token to the user after a
   successful submission in `index.html`/`app.js` ("save this code to delete your data").
-- [ ] T012 [US3] (depends on T011) Extend `tests/smoke.test.ts`: submission with false or absent
+- [x] T012 [US3] (depends on T011) Extend `tests/smoke.test.ts`: submission with false or absent
   `consent` → rejected; full deletion cycle (create → delete with wrong token → `403` → delete
   with correct token → `200` → no longer appears in `GET /api/traces` after approval);
   `GET /politica-de-privacidad` and `GET /aviso-legal` → `200` with a non-empty body.
@@ -172,7 +172,7 @@ referenced by `config.json` respond with real content.
   `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`,
   `Content-Security-Policy: default-src 'self'` (adjusted if `index.html`/`admin.html` load
   anything from another origin).
-- [ ] T014 [US4] [P] Update the recommended Nginx block in `README.md` to add
+- [x] T014 [US4] [P] Update the recommended Nginx block in `README.md` to add
   `Strict-Transport-Security` and the same headers at the proxy level as defense in depth
   (complements T013, doesn't replace it).
 - [x] T015 [US4] (depends on T013) Extend `tests/smoke.test.ts`: check that `GET /`,
@@ -189,12 +189,12 @@ attempts per IP.
 
 **Independent Test**: See spec.md US5.
 
-- [X] T016 [US5] (depends on T015) Add an `audit_log` table (id, action, trace_id, source_ip,
+- [x] T016 [US5] (depends on T015) Add an `audit_log` table (id, action, trace_id, source_ip,
   created_at) via an idempotent migration in `initDb()`; insert a row from `handleUpdateStatus`,
   `handleUpdateTrace`, and `handleDeleteTrace`, and from `handleAdminLogin` (both success and
   failure); add `GET /api/admin/audit-log` (protected with `requireAdmin`), paginated by
   `created_at` descending.
-- [X] T017 [US5] (depends on T016) Apply per-IP lockout to `POST /api/admin/login`, reusing the
+- [x] T017 [US5] (depends on T016) Apply per-IP lockout to `POST /api/admin/login`, reusing the
   rate-limiter structure from T003 (failure counter per IP, e.g. max 5 failed attempts in 15
   minutes → `429` until it expires, even with the correct password).
 - [x] T018 [US5] (depends on T017) Extend `tests/smoke.test.ts`: an admin action (e.g. approving
