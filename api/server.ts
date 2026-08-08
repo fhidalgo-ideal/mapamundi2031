@@ -253,6 +253,81 @@ function resolveCoordinates(city: string, country: string): [number, number] {
   return [lat, lng];
 }
 
+// In-memory geocode cache: normalized "city|country" -> [lat, lng]. Successful
+// Nominatim lookups are memoized for the process lifetime so the same pair is
+// never geocoded twice, which also keeps us well under the service's rate
+// policy for repeated contributions from the same place.
+const geocodeCache = new Map<string, [number, number]>();
+
+// Nominatim's usage policy caps callers at 1 request/second. Given this
+// project's very low write volume a single module-level timestamp gate is
+// enough to stay compliant without a full queue. The endpoint is overridable
+// (GRANADA_NOMINATIM_ENDPOINT) so tests can point at an unreachable host and
+// exercise the deterministic fallback chain without touching the live service.
+const NOMINATIM_ENDPOINT =
+  process.env.GRANADA_NOMINATIM_ENDPOINT ?? "https://nominatim.openstreetmap.org/search";
+const NOMINATIM_USER_AGENT = "Granada2031/1.0 (https://github.com/efaguilera/mapamundi)";
+const NOMINATIM_MIN_INTERVAL_MS = 1000;
+const NOMINATIM_TIMEOUT_MS = 4000;
+let lastNominatimRequestAt = 0;
+
+// Geocodes a place at city/town precision via Nominatim's structured search
+// (city=/country= params, never a free-form q= or addressdetails=1 — we only
+// have and only want city-level coordinates). Returns null on any failure so
+// the caller can fall back deterministically; a contribution must never fail
+// to submit because geocoding did.
+async function geocodeCity(city: string, country: string): Promise<[number, number] | null> {
+  const url = new URL(NOMINATIM_ENDPOINT);
+  url.searchParams.set("city", city);
+  url.searchParams.set("country", country);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", "1");
+
+  const waitMs = lastNominatimRequestAt + NOMINATIM_MIN_INTERVAL_MS - Date.now();
+  if (waitMs > 0) {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    setTimeout(resolve, waitMs);
+    await promise;
+  }
+  lastNominatimRequestAt = Date.now();
+
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": NOMINATIM_USER_AGENT },
+      signal: AbortSignal.timeout(NOMINATIM_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    const results = (await response.json()) as Array<{ lat?: string; lon?: string }>;
+    const first = Array.isArray(results) ? results[0] : undefined;
+    if (!first || first.lat === undefined || first.lon === undefined) return null;
+    const lat = Number(first.lat);
+    const lng = Number(first.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return [lat, lng];
+  } catch {
+    return null;
+  }
+}
+
+// Async coordinate resolution used by the write handlers. Order: in-memory
+// cache -> curated CITY_COORDINATES fast-path (known cities skip the network
+// entirely) -> live Nominatim geocode -> the deterministic
+// COUNTRY_FALLBACK/hash chain via resolveCoordinates when Nominatim fails,
+// times out, or returns nothing.
+async function resolveCoordinatesAsync(city: string, country: string): Promise<[number, number]> {
+  const key = `${normalizeText(city)}|${normalizeText(country)}`;
+  const cached = geocodeCache.get(key);
+  if (cached) return cached;
+  if (key in CITY_COORDINATES) return CITY_COORDINATES[key];
+
+  const geocoded = await geocodeCity(city, country);
+  if (geocoded) {
+    geocodeCache.set(key, geocoded);
+    return geocoded;
+  }
+  return resolveCoordinates(city, country);
+}
+
 function nowIso(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }
@@ -1056,7 +1131,7 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   const sanitized = stripExif(headerBytes, sniffedType);
   await Bun.write(destination, sanitized);
 
-  const [lat, lng] = resolveCoordinates(values.city, values.country);
+  const [lat, lng] = await resolveCoordinatesAsync(values.city, values.country);
   // Deletion token: returned once in this response and never persisted in
   // plaintext, so a leaked DB dump alone can't be used to self-delete
   // someone else's contribution.
@@ -1210,7 +1285,7 @@ async function handleUpdateTrace(request: Request, traceId: string, server?: IpR
     }
     const city = (updates.city as string) ?? current.city;
     const country = (updates.country as string) ?? current.country;
-    const [lat, lng] = resolveCoordinates(city, country);
+    const [lat, lng] = await resolveCoordinatesAsync(city, country);
     updates.lat = lat;
     updates.lng = lng;
   }

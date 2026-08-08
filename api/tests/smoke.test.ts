@@ -94,6 +94,11 @@ beforeAll(async () => {
       GRANADA_DB_PATH: join(dataDir, "granada2031.sqlite3"),
       GRANADA_CONFIG_PATH: join(dataDir, "config.json"),
       GRANADA_SECRETS_PATH: join(dataDir, ".dev"),
+      // Point geocoding at an unreachable host so the suite never depends on
+      // live Nominatim: known cities take the CITY_COORDINATES fast-path (no
+      // network at all), and unlisted cities deterministically exercise the
+      // COUNTRY_FALLBACK/hash fallback chain when the request fails fast.
+      GRANADA_NOMINATIM_ENDPOINT: "http://127.0.0.1:1/search",
     },
     stdin: "ignore",
     stdout: "pipe",
@@ -158,8 +163,41 @@ describe("smoke", () => {
     expect(response.status).toBe(201);
     const body = await response.json();
     expect(body.trace.status).toBe("pending");
+    // "Granada"/"Espana" is a curated CITY_COORDINATES entry, so it resolves
+    // via the fast-path without ever hitting Nominatim (GEO01).
+    expect(body.trace.lat).toBeCloseTo(37.1773, 4);
+    expect(body.trace.lng).toBeCloseTo(-3.5986, 4);
     createdTraceId = body.trace.id;
     expect(createdTraceId).toBeTruthy();
+  });
+
+  test("POST /api/traces falls back to country coordinates when geocoding is unavailable", async () => {
+    // GEO01: this city is NOT in CITY_COORDINATES, so it would normally be
+    // geocoded via Nominatim. The suite points GRANADA_NOMINATIM_ENDPOINT at an
+    // unreachable host, so the request fails fast and resolution falls back to
+    // the COUNTRY_FALLBACK entry for "Espana" — never failing the submission.
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const form = new FormData();
+    form.set("name", "Fallback Test");
+    form.set("email", "fallback@example.com");
+    form.set("city", "Villanueva del Ejemplo");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Prueba de fallback de geocodificacion.");
+    form.set("consent", "true");
+    form.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.50" },
+      body: form,
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    // COUNTRY_FALLBACK["espana"] = [40.4637, -3.7492].
+    expect(body.trace.lat).toBeCloseTo(40.4637, 4);
+    expect(body.trace.lng).toBeCloseTo(-3.7492, 4);
   });
 
   test("GET /api/traces hides the contribution until it's approved", async () => {
