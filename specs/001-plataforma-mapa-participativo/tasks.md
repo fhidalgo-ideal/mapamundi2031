@@ -165,7 +165,7 @@ referenced by `config.json` respond with real content.
 
 **Independent Test**: See spec.md US4.
 
-- [ ] T013 [US4] (depends on T012) Add `withSecurityHeaders(response: Response): Response` in
+- [x] T013 [US4] (depends on T012) Add `withSecurityHeaders(response: Response): Response` in
   `server.ts` and wrap every response returned from `handleRequest` with it (this single
   fetch-handler entry point covers JSON responses, static files, and `/uploads/<file>` alike, so
   there's no need for a Python-style `end_headers` override): `X-Content-Type-Options: nosniff`,

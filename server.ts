@@ -687,6 +687,19 @@ function demoSvg(label: string, colorA: string, colorB: string): Uint8Array {
   return new TextEncoder().encode(svg);
 }
 
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -1256,7 +1269,7 @@ if (import.meta.main) {
   const server = Bun.serve({
     hostname: host,
     port,
-    fetch: handleRequest,
+    fetch: async (request: Request, server) => withSecurityHeaders(await handleRequest(request, server)),
   });
   console.log(`Granada 2031 escuchando en http://${server.hostname}:${server.port}`);
 }
