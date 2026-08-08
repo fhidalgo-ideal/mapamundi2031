@@ -19,27 +19,52 @@
       <div class="topbar-nav">
         <nav aria-label="Navegacion principal">
           <a href="#mapa">Mapa</a>
-          <a href="#participa">Participa</a>
+          <a href="#participa" data-open-contribute>Participa</a>
           <a href="#archivo">Archivo</a>
         </nav>
-        <a class="button nav-cta" href="#participa">Subir foto</a>
+        <button class="button nav-cta" type="button" data-open-contribute>Subir foto</button>
       </div>
     </header>
 
     <main>
       <section class="hero" id="mapa" aria-labelledby="hero-title">
-        <div class="hero-bg" aria-hidden="true"></div>
-        <div class="hero-copy">
-          <p class="eyebrow" id="heroEyebrow">Candidatura cultural participativa</p>
-          <h1 id="hero-title">Granada encendida en el mundo</h1>
-          <p id="heroText">
-            Cada foto compartida abre una luz: un recuerdo, una huella o una emocion
-            que conecta a Granada con otra ciudad del planeta.
-          </p>
-          <div class="hero-actions">
-            <a class="button primary" id="submitCta" href="#participa">Subir un rastro</a>
-            <button class="button ghost" id="focusLatest" type="button">Ver ultima luz</button>
+        <div class="hero-inner">
+          <figure class="polaroid polaroid-left" id="heroPolaroidLeft">
+            <img alt="">
+            <figcaption></figcaption>
+          </figure>
+          <div class="hero-copy">
+            <h1 id="hero-title">
+              <span class="hero-line-1">GRANADA</span>
+              <span class="hero-line-2">es de to' el mundo</span>
+            </h1>
+            <p id="heroText">
+              Cada foto compartida abre una luz: un recuerdo, una huella o una emocion
+              que conecta a Granada con otra ciudad del planeta.
+            </p>
+            <div class="hero-actions">
+              <button class="button primary" id="heroSubmit" type="button" data-open-contribute>Subir mi foto</button>
+              <button class="button ghost" id="heroViewMap" type="button">Ver el mapa en vivo</button>
+            </div>
+            <dl class="hero-stats" id="heroStats" aria-label="Estadisticas de participacion">
+              <div class="stat">
+                <dt id="statPhotos">0</dt>
+                <dd>fotos subidas</dd>
+              </div>
+              <div class="stat">
+                <dt id="statCountries">0</dt>
+                <dd>paises</dd>
+              </div>
+              <div class="stat">
+                <dt id="statCities">0</dt>
+                <dd>ciudades</dd>
+              </div>
+            </dl>
           </div>
+          <figure class="polaroid polaroid-right" id="heroPolaroidRight">
+            <img alt="">
+            <figcaption></figcaption>
+          </figure>
         </div>
       </section>
 
@@ -69,7 +94,9 @@
         </div>
       </section>
 
-      <section class="submit-section" id="participa" aria-labelledby="submit-title">
+      <div class="modal-overlay hidden" id="participa" aria-hidden="true">
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="submit-title">
+          <button class="icon-button modal-close" id="closeContribute" type="button" aria-label="Cerrar formulario">×</button>
         <div class="section-heading">
           <p class="eyebrow" id="submitEyebrow">Nueva contribucion</p>
           <h2 id="submit-title">Sube tu rastro de Granada</h2>
@@ -147,7 +174,8 @@
           <option value="Rabat"></option>
           <option value="Londres"></option>
         </datalist>
-      </section>
+        </div>
+      </div>
 
       <section class="archive-section" id="archivo" aria-labelledby="archive-title">
         <div class="section-heading">

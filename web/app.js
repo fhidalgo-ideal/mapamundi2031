@@ -99,11 +99,7 @@ function applyPublicConfig(config) {
   if (config.site_title) document.title = config.site_title;
   setText("#brandName", config.brand_name);
   setText("#brandSubtitle", config.brand_subtitle);
-  setText("#heroEyebrow", config.hero_eyebrow);
-  setText("#hero-title", config.hero_title);
   setText("#heroText", config.hero_text);
-  setText("#submitCta", config.submit_cta);
-  setText("#focusLatest", config.latest_cta);
   setText("#mapTitle", config.map_title);
   setText("#mapHint", config.map_hint);
   setText("#submitEyebrow", config.submit_eyebrow);
@@ -467,8 +463,46 @@ function closeStory() {
 
 function renderStats() {
   const approved = approvedTraces();
-  document.querySelector("#approvedCount").textContent = approved.length;
-  document.querySelector("#countryCount").textContent = new Set(approved.map((trace) => normalize(trace.country))).size;
+  const countries = new Set(approved.map((trace) => normalize(trace.country))).size;
+  const cities = new Set(
+    approved.map((trace) => `${normalize(trace.city)}|${normalize(trace.country)}`),
+  ).size;
+
+  const setStat = (selector, value) => {
+    const element = document.querySelector(selector);
+    if (element) element.textContent = value;
+  };
+
+  setStat("#approvedCount", approved.length);
+  setStat("#countryCount", countries);
+  setStat("#statPhotos", approved.length);
+  setStat("#statCountries", countries);
+  setStat("#statCities", cities);
+}
+
+const HERO_POLAROID_FALLBACKS = [
+  { photo: "/demo/berlin.svg", city: "Berlin" },
+  { photo: "/demo/buenos-aires.svg", city: "Buenos Aires" },
+];
+
+function renderHeroPolaroids() {
+  const approved = approvedTraces()
+    .slice()
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const cards = [
+    document.querySelector("#heroPolaroidLeft"),
+    document.querySelector("#heroPolaroidRight"),
+  ];
+
+  cards.forEach((card, index) => {
+    if (!card) return;
+    const source = approved[index] || HERO_POLAROID_FALLBACKS[index];
+    const img = card.querySelector("img");
+    const caption = card.querySelector("figcaption");
+    img.src = source.photo;
+    img.alt = `Rastro de Granada en ${source.city}`;
+    caption.textContent = source.city;
+  });
 }
 
 function renderArchive() {
@@ -501,6 +535,7 @@ function renderArchive() {
 
 function renderAll() {
   renderStats();
+  renderHeroPolaroids();
   renderArchive();
 }
 
@@ -648,13 +683,45 @@ storyPanel.addEventListener("click", (event) => {
   if (event.target === storyPanel) closeStory();
 });
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closeStory();
+const contributeModal = document.querySelector("#participa");
+
+function openContributeModal() {
+  if (!contributeModal) return;
+  contributeModal.classList.remove("hidden");
+  contributeModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  const firstField = contributeModal.querySelector('.trace-form [name="name"]');
+  if (firstField) firstField.focus();
+}
+
+function closeContributeModal() {
+  if (!contributeModal) return;
+  contributeModal.classList.add("hidden");
+  contributeModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+}
+
+document.querySelectorAll("[data-open-contribute]").forEach((trigger) => {
+  trigger.addEventListener("click", (event) => {
+    event.preventDefault();
+    openContributeModal();
+  });
 });
 
-document.querySelector("#focusLatest").addEventListener("click", () => {
-  const latest = approvedTraces().slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-  if (latest) openStory(latest);
+document.querySelector("#closeContribute")?.addEventListener("click", closeContributeModal);
+contributeModal?.addEventListener("click", (event) => {
+  if (event.target === contributeModal) closeContributeModal();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeStory();
+    closeContributeModal();
+  }
+});
+
+document.querySelector("#heroViewMap")?.addEventListener("click", () => {
+  document.querySelector(".map-section")?.scrollIntoView({ behavior: "smooth" });
 });
 
 window.addEventListener("beforeunload", () => cancelAnimationFrame(animationFrame));
