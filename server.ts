@@ -53,6 +53,9 @@ const DEFAULT_PUBLIC_CONFIG = {
   ideal_logo: "",
   ideal_logo_alt: "IDEAL",
   ideal_url: "https://www.ideal.es",
+  legal_deletion_contact: "privacy@granada2031.es",
+  legal_deletion_note: "Guarde el codigo de eliminacion que se le proporcionara tras enviar. Puede usarlo para borrar su contribucion en cualquier momento.",
+  legal_data_retention: "Los datos personales se conservan mientras la contribucion permanezca publicada. Puede eliminarla en cualquier momento usando su codigo de eliminacion.",
 };
 
 const CITY_COORDINATES: Record<string, [number, number]> = {
@@ -1088,7 +1091,7 @@ function handleDemoImage(path: string): Response {
 // Explicit allowlist: never serve static files outside these paths, so .dev
 // (secrets), server.ts (source code), and everything else in BASE_DIR stays
 // unreachable just by virtue of living in the project directory.
-const PUBLIC_FILES = new Set(["/index.html", "/admin.html", "/app.js", "/admin.js", "/styles.css", "/config.json"]);
+const PUBLIC_FILES = new Set(["/index.html", "/admin.html", "/app.js", "/admin.js", "/styles.css", "/config.json", "/politica-de-privacidad.html", "/aviso-legal.html"]);
 const PUBLIC_DIRS = ["/admin/", "/uploads/", "/assets/"];
 
 function resolveStaticPath(pathname: string): string | null {
@@ -1137,6 +1140,12 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
   if (request.method === "GET") {
     if (path === "/admin" || path === "/admin/") {
       return serveStatic("/admin.html");
+    }
+    if (path === "/politica-de-privacidad" || path === "/politica-de-privacidad/") {
+      return serveStatic("/politica-de-privacidad.html");
+    }
+    if (path === "/aviso-legal" || path === "/aviso-legal/") {
+      return serveStatic("/aviso-legal.html");
     }
     if (path === "/api/health") {
       return jsonResponse({

@@ -518,17 +518,27 @@ form.addEventListener("submit", async (event) => {
   status.textContent = "Subiendo contribucion al servidor...";
 
   try {
-    await apiRequest("/traces", {
+    const response = await apiRequest("/traces", {
       method: "POST",
       body: data
     });
     form.reset();
-    status.textContent = "Recibido. Tu luz esta guardada en el servidor y queda en revision.";
+    
+    // Display deletion token to user
+    if (response.deletionToken) {
+      const tokenMessage = `Recibido. Tu luz esta guardada en el servidor y queda en revision.\n\n⚠️ GUARDA ESTE CODIGO PARA ELIMINAR TU CONTRIBUCION:\n\n${response.deletionToken}\n\nSi lo pierdes, no podras borrar tu aportacion. Cópialo a un lugar seguro.`;
+      status.textContent = tokenMessage;
+      status.style.whiteSpace = "pre-wrap";
+    } else {
+      status.textContent = "Recibido. Tu luz esta guardada en el servidor y queda en revision.";
+    }
+    
     await loadTraces();
   } catch (error) {
     status.textContent = error.message;
   }
 });
+
 
 document.querySelectorAll("[data-filter]").forEach((button) => {
   button.addEventListener("click", () => {
