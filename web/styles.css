@@ -1291,7 +1291,10 @@ textarea {
   overflow-y: auto;
   padding: clamp(16px, 5vh, 64px) 16px;
   position: fixed;
-  z-index: 40;
+  /* Must beat the map's own stacked UI (.map-controls/.map-hint at 1000,
+     Leaflet's internal panes up to 700) or the live map bleeds through the
+     modal wherever it's scrolled into view behind it. */
+  z-index: 2000;
 }
 
 .modal-overlay.hidden {
