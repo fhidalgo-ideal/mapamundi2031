@@ -46,6 +46,40 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 requestAnimationFrame(() => map.invalidateSize());
 window.addEventListener("resize", () => map.invalidateSize());
 
+// Approved traces are shown as custom glowing markers (see .trace-marker in
+// styles.css). They live in a single LayerGroup so emotion filters can add or
+// remove markers without recreating them or redrawing the whole map.
+const markerLayer = L.layerGroup().addTo(map);
+let traceMarkers = [];
+
+function traceMarkerIcon() {
+  return L.divIcon({
+    className: "trace-marker",
+    html: '<span class="trace-marker__dot"></span>',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
+
+function buildMarkers() {
+  traceMarkers = approvedTraces().map((trace) => {
+    const marker = L.marker([trace.lat, trace.lng], {
+      icon: traceMarkerIcon(),
+      title: `${trace.city}, ${trace.country}`,
+    });
+    marker.on("click", () => openStory(trace));
+    return { trace, marker };
+  });
+  renderMarkers();
+}
+
+function renderMarkers() {
+  markerLayer.clearLayers();
+  traceMarkers
+    .filter(({ trace }) => activeFilter === "all" || trace.emotion === activeFilter)
+    .forEach(({ marker }) => marker.addTo(markerLayer));
+}
+
 async function apiRequest(path, options = {}) {
   if (window.location.protocol === "file:") {
     throw new Error("Abre el MVP desde el servidor Bun, no directamente como archivo. Ejecuta: bun run api/server.ts --host 0.0.0.0 --port 8080");
@@ -270,6 +304,7 @@ archiveLoadMoreButton.addEventListener("click", () => {
 });
 
 function renderAll() {
+  buildMarkers();
   renderStats();
   renderHeroPolaroids();
   renderArchive();
@@ -346,6 +381,7 @@ document.querySelectorAll("[data-filter]").forEach((button) => {
   button.addEventListener("click", () => {
     activeFilter = button.dataset.filter;
     document.querySelectorAll("[data-filter]").forEach((item) => item.classList.toggle("active", item === button));
+    renderMarkers();
     closeStory();
   });
 });

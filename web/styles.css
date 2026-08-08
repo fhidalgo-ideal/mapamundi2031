@@ -591,6 +591,31 @@ h2 {
   width: 100%;
 }
 
+/* Custom glowing trace pins (L.divIcon). Warm amber to match the dark map
+   card / old canvas mapPointColor, not Leaflet's default blue marker. */
+.trace-marker {
+  background: none;
+  border: 0;
+}
+
+.trace-marker__dot {
+  display: block;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #ffd79a 0%, #f7a94a 55%, #e8892f 100%);
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 0 3px rgba(247, 169, 74, 0.28), 0 0 14px 4px rgba(247, 169, 74, 0.55);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.trace-marker:hover .trace-marker__dot,
+.trace-marker:focus-visible .trace-marker__dot {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 4px rgba(247, 169, 74, 0.36), 0 0 20px 6px rgba(247, 169, 74, 0.7);
+}
+
 .map-controls {
   display: grid;
   gap: 8px;

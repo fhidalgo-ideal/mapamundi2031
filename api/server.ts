@@ -175,6 +175,22 @@ const SEED_TRACES: SeedTrace[] = [
     status: "pending",
     createdAt: "2026-05-01T12:00:00+00:00",
   },
+  {
+    id: "seed-estambul",
+    name: "Yusuf Aydin",
+    email: "yusuf@example.com",
+    city: "Estambul",
+    country: "Turquia",
+    lat: 41.0082,
+    lng: 28.9784,
+    relation: "Artista o investigador/a",
+    emotion: "asombro",
+    feeling:
+      "Al atardecer, la silueta de las cupulas sobre el Bosforo me recuerda el perfil de la Alhambra recortado sobre Sierra Nevada.",
+    photo: "/assets/estambul.jpg",
+    status: "approved",
+    createdAt: "2026-06-20T18:45:00+00:00",
+  },
 ];
 
 function ensureConfig() {
