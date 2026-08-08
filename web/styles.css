@@ -291,6 +291,26 @@ h1 {
   padding: 64px clamp(18px, 4vw, 56px);
 }
 
+.dark-pullquote-banner {
+  background: var(--bg-dark);
+  padding: 96px clamp(18px, 4vw, 56px);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.pullquote-text {
+  color: var(--ink-on-dark);
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  max-width: 900px;
+  letter-spacing: -0.01em;
+}
+
 .admin-page {
   padding-top: 92px;
 }
