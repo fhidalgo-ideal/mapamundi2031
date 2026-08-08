@@ -617,4 +617,24 @@ describe("smoke", () => {
     const legalBody = await legalResponse.text();
     expect(legalBody.length).toBeGreaterThan(0);
   });
+  test("GET /, GET /api/health, and GET /api/traces include security headers", async () => {
+    const securityHeaders = {
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Content-Security-Policy": "default-src 'self'; img-src 'self' data:",
+    };
+
+    const endpoints = ["/", "/api/health", "/api/traces"];
+
+    for (const endpoint of endpoints) {
+      const response = await fetch(`${baseUrl}${endpoint}`);
+      expect(response.status).toBe(200);
+
+      for (const [headerName, expectedValue] of Object.entries(securityHeaders)) {
+        const headerValue = response.headers.get(headerName);
+        expect(headerValue).toBe(expectedValue);
+      }
+    }
+  });
 });

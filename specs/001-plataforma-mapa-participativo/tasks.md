@@ -175,7 +175,7 @@ referenced by `config.json` respond with real content.
 - [ ] T014 [US4] [P] Update the recommended Nginx block in `README.md` to add
   `Strict-Transport-Security` and the same headers at the proxy level as defense in depth
   (complements T013, doesn't replace it).
-- [ ] T015 [US4] (depends on T013) Extend `tests/smoke.test.ts`: check that `GET /`,
+- [x] T015 [US4] (depends on T013) Extend `tests/smoke.test.ts`: check that `GET /`,
   `GET /api/health`, and `GET /api/traces` include the four headers from T013.
 
 **Checkpoint**: US1-US4 work independently of each other.
