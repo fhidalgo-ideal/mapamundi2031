@@ -12,11 +12,19 @@ The MVP uses SQLite as the server's local database:
 - Uploaded images: `uploads/`
 - Admin secrets: `.dev` (git-ignored)
 - Public configuration: `config.json`
-- Server: Bun (JavaScript/TypeScript runtime) with built-in SQLite support (`bun:sqlite`), no external runtime dependencies. The frontend vendors a single browser library, Leaflet, as static assets under `web/vendor/leaflet/` for the OpenStreetMap map.
+- Server: Bun (JavaScript/TypeScript runtime) with built-in SQLite support (`bun:sqlite`), no external server-side dependencies.
 
 SQLite is the right choice for this phase: it needs no separate database service, backups are a single-file copy, and it comfortably handles a first moderated participatory campaign.
 
 For a production phase with thousands of contributions, advanced geo search, analytics, or multi-user administration, the natural migration path is PostgreSQL with PostGIS and image storage in S3/MinIO.
+
+## Frontend dependencies
+
+The frontend includes **one external JavaScript dependency: Leaflet** (https://leafletjs.com), a lightweight map library. Leaflet is vendored as static assets under `web/vendor/leaflet/` and **not loaded from a CDN**. This removes external network dependencies at runtime.
+
+The project uses Leaflet to render interactive OpenStreetMap (OSM) tiles for the participatory map. Per OSM's tile usage policy, the map includes proper attribution: "© OpenStreetMap contributors" (visible on the map's bottom-right corner via Leaflet's attribution control).
+
+See `web/app.js` (lines 29–42) for Leaflet initialization and tile layer setup, including the required OSM attribution string.
 
 ## Project layout
 
@@ -182,7 +190,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org" always;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -213,7 +221,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org" always;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
