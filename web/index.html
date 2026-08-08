@@ -179,11 +179,19 @@
             Describe el sentimiento
             <textarea name="feeling" required maxlength="360" placeholder="Cuenta que conecta esta foto con Granada"></textarea>
           </label>
-          <label class="file-drop wide" id="fileDrop">
-            <input name="photo" type="file" accept="image/*" required>
-            <span>Selecciona una fotografia</span>
-            <small>JPG, PNG o WEBP. En este MVP se almacena en el servidor.</small>
-          </label>
+          <div class="file-drop wide" id="fileDrop">
+            <div class="file-drop-zone" id="fileDropZone">
+              <input id="photoInput" name="photo" class="file-drop-input" type="file" accept="image/*" multiple required>
+              <svg class="file-drop-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <path d="M12 15V4m0 0-4 4m4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span class="file-drop-label">Arrastra tus fotografias aqui o haz clic para elegir</span>
+              <small>JPG, PNG o WEBP. Hasta 5 fotografias.</small>
+            </div>
+            <div class="file-drop-previews" id="filePreviews" hidden></div>
+            <p class="file-drop-message" id="fileDropMessage" role="alert" hidden></p>
+          </div>
           <label class="consent wide">
             <input name="consent" type="checkbox" required>
             <span id="consentText">Acepto que esta fotografia y el texto se usen en la accion cultural Granada 2031.</span>

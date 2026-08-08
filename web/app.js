@@ -22,6 +22,11 @@ const storyPanel = document.querySelector("#storyPanel");
 const zoomInButton = document.querySelector("#zoomIn");
 const zoomOutButton = document.querySelector("#zoomOut");
 const zoomResetButton = document.querySelector("#zoomReset");
+const photoInput = document.querySelector("#photoInput");
+const photoDropZone = document.querySelector("#fileDropZone");
+const photoPreviews = document.querySelector("#filePreviews");
+const photoMessage = document.querySelector("#fileDropMessage");
+const MAX_PHOTOS = 5;
 
 const INITIAL_CENTER = [20, 0];
 const INITIAL_ZOOM = 2;
@@ -310,14 +315,94 @@ function renderAll() {
   renderArchive();
 }
 
+let photoPreviewUrls = [];
+
+function revokePhotoPreviewUrls() {
+  photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  photoPreviewUrls = [];
+}
+
+function filesToFileList(files) {
+  const dataTransfer = new DataTransfer();
+  files.forEach((file) => dataTransfer.items.add(file));
+  return dataTransfer.files;
+}
+
+function setPhotoMessage(message) {
+  photoMessage.textContent = message;
+  photoMessage.hidden = !message;
+}
+
+function renderPhotoPreviews() {
+  revokePhotoPreviewUrls();
+  const files = Array.from(photoInput.files);
+  photoPreviews.innerHTML = "";
+  photoPreviews.hidden = files.length === 0;
+
+  files.forEach((file, index) => {
+    const url = URL.createObjectURL(file);
+    photoPreviewUrls.push(url);
+
+    const figure = document.createElement("figure");
+    figure.className = "file-preview";
+
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = file.name;
+    figure.appendChild(img);
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "file-preview-remove";
+    removeButton.setAttribute("aria-label", `Quitar ${file.name}`);
+    removeButton.textContent = "×";
+    removeButton.addEventListener("click", () => removePhotoAt(index));
+    figure.appendChild(removeButton);
+
+    photoPreviews.appendChild(figure);
+  });
+}
+
+function removePhotoAt(index) {
+  const remaining = Array.from(photoInput.files).filter((_, i) => i !== index);
+  photoInput.files = filesToFileList(remaining);
+  if (remaining.length === 0) setPhotoMessage("");
+  renderPhotoPreviews();
+}
+
+function resetPhotoField() {
+  revokePhotoPreviewUrls();
+  photoPreviews.innerHTML = "";
+  photoPreviews.hidden = true;
+  setPhotoMessage("");
+  photoDropZone.classList.remove("is-dragover");
+}
+
+photoInput.addEventListener("change", () => {
+  const files = Array.from(photoInput.files);
+  if (files.length > MAX_PHOTOS) {
+    setPhotoMessage(`Solo puedes seleccionar hasta ${MAX_PHOTOS} fotografias. Se han descartado las demas.`);
+    photoInput.files = filesToFileList(files.slice(0, MAX_PHOTOS));
+  } else {
+    setPhotoMessage("");
+  }
+  renderPhotoPreviews();
+});
+
+["dragenter", "dragover"].forEach((eventName) => {
+  photoInput.addEventListener(eventName, () => photoDropZone.classList.add("is-dragover"));
+});
+["dragleave", "drop"].forEach((eventName) => {
+  photoInput.addEventListener(eventName, () => photoDropZone.classList.remove("is-dragover"));
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = new FormData(form);
   const status = document.querySelector("#formStatus");
-  const photo = data.get("photo");
 
-  if (!photo || !photo.size) {
-    status.textContent = "Selecciona una fotografia para continuar.";
+  if (!photoInput.files.length) {
+    status.textContent = "Selecciona al menos una fotografia para continuar.";
     return;
   }
 
@@ -329,6 +414,7 @@ form.addEventListener("submit", async (event) => {
       body: data
     });
     form.reset();
+    resetPhotoField();
     
     // Display deletion token to user
     if (response.deletionToken) {

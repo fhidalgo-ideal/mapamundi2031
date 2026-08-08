@@ -792,28 +792,109 @@ textarea {
 }
 
 .file-drop {
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+
+.file-drop-zone {
   align-items: center;
-  border: 1px dashed rgba(247, 198, 103, 0.55);
-  border-radius: 8px;
+  background: rgba(242, 109, 91, 0.04);
+  border: 2px dashed rgba(242, 109, 91, 0.4);
+  border-radius: 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
   justify-items: center;
   min-height: 134px;
-  padding: 20px;
+  padding: 24px 20px;
+  position: relative;
   text-align: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.file-drop input {
-  inline-size: min(100%, 330px);
+.file-drop-zone:hover,
+.file-drop-zone.is-dragover {
+  background: rgba(242, 109, 91, 0.1);
+  border-color: var(--coral);
 }
 
-.file-drop span {
-  color: var(--ink);
-  font-size: 18px;
+.file-drop-input {
+  cursor: pointer;
+  height: 100%;
+  inset: 0;
+  opacity: 0;
+  position: absolute;
+  width: 100%;
 }
 
-.file-drop small,
+.file-drop-icon {
+  color: var(--coral);
+}
+
+.file-drop-label {
+  color: var(--ink-on-light);
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .consent span,
 #formStatus {
   color: var(--muted);
+}
+
+.file-drop small {
+  color: var(--muted-on-light);
+}
+
+.file-drop-message {
+  color: var(--coral);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.file-drop-previews {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+
+.file-preview {
+  margin: 0;
+  position: relative;
+}
+
+.file-preview img {
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.file-preview-remove {
+  align-items: center;
+  background: rgba(26, 26, 26, 0.75);
+  border: 2px solid var(--bg-light);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  font-size: 16px;
+  font-weight: 900;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  width: 24px;
+}
+
+.file-preview-remove:hover {
+  background: var(--coral);
 }
 
 .consent {
