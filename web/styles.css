@@ -343,29 +343,16 @@ h1 {
   }
 }
 
-.map-toolbar,
 .section-heading,
 .admin-layout {
   margin: 0 auto 22px;
   max-width: 1280px;
 }
 
-.map-toolbar {
-  align-items: end;
-  display: flex;
-  gap: 18px;
-  justify-content: space-between;
-}
-
 h2 {
   font-size: clamp(30px, 4vw, 52px);
   line-height: 1;
   margin-bottom: 8px;
-}
-
-.map-toolbar p,
-.section-heading p:not(.eyebrow) {
-  color: var(--muted);
 }
 
 .chip {
@@ -384,14 +371,34 @@ h2 {
 }
 
 .map-shell {
-  aspect-ratio: 1400 / 760;
-  background: linear-gradient(180deg, #101a2a, #07101e);
+  background: var(--bg-dark);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  border-radius: 28px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.4), 0 0 120px rgba(247, 198, 103, 0.08);
   color: var(--ink-on-dark);
   margin: 0 auto;
   max-width: 1280px;
+  padding: clamp(18px, 3vw, 32px);
+}
+
+.map-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.map-toolbar p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.map-canvas-wrap {
+  aspect-ratio: 1400 / 760;
+  background: linear-gradient(180deg, #101a2a, #07101e);
+  border-radius: 16px;
   overflow: hidden;
   position: relative;
 }
@@ -412,17 +419,18 @@ h2 {
   z-index: 4;
 }
 
-.map-control {
+.map-controls .map-control {
   background: rgba(10, 15, 26, 0.82);
   border: 1px solid var(--line);
   position: static;
 }
 
-.map-control.reset {
+.map-controls .map-control.reset {
   border-radius: 999px;
   font-size: 12px;
   width: 46px;
 }
+
 
 .map-hint {
   background: rgba(10, 15, 26, 0.76);
@@ -921,6 +929,11 @@ textarea {
   .admin-section {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .map-shell {
+    border-radius: 18px;
+    padding: 14px;
   }
 
   .map-hint {

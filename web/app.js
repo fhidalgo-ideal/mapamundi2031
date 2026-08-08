@@ -7,12 +7,7 @@ const emotionLabels = {
   futuro: "Futuro"
 };
 
-const emotionColors = {
-  nostalgia: "#f26d5b",
-  pertenencia: "#9ccf6b",
-  asombro: "#67d7c4",
-  futuro: "#b896ff"
-};
+const mapPointColor = "#f7a94a";
 
 let traces = [];
 let activeFilter = "all";
@@ -101,6 +96,7 @@ function applyPublicConfig(config) {
   setText("#brandSubtitle", config.brand_subtitle);
   setText("#heroText", config.hero_text);
   setText("#mapTitle", config.map_title);
+  setText("#mapSectionTitle", config.hero_title);
   setText("#mapHint", config.map_hint);
   setText("#submitEyebrow", config.submit_eyebrow);
   setText("#submit-title", config.submit_title);
@@ -403,7 +399,7 @@ function drawConnections(time) {
 function drawLights(time) {
   visibleTraces().forEach((trace, index) => {
     const point = project(trace.lat, trace.lng);
-    const color = emotionColors[trace.emotion] || "#f7c667";
+    const color = mapPointColor;
     const isSelected = trace.id === selectedTraceId;
     const pulse = (Math.sin(time / 420 + index * 1.8) + 1) / 2;
     const radius = (isSelected ? 10 : 6) / Math.sqrt(mapView.scale);

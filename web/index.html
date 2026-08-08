@@ -96,28 +96,32 @@
       </section>
 
       <section class="map-section" aria-label="Mapa de luces">
-        <div class="map-toolbar">
-          <div>
-            <h2 id="mapTitle">Mapa vivo</h2>
-            <p><span id="approvedCount">0</span> luces aprobadas en <span id="countryCount">0</span> paises</p>
-          </div>
-          <div class="filters" role="group" aria-label="Filtros de emocion">
-            <button class="chip active" type="button" data-filter="all">Todas</button>
-            <button class="chip" type="button" data-filter="nostalgia">Nostalgia</button>
-            <button class="chip" type="button" data-filter="pertenencia">Pertenencia</button>
-            <button class="chip" type="button" data-filter="asombro">Asombro</button>
-            <button class="chip" type="button" data-filter="futuro">Futuro</button>
-          </div>
+        <div class="section-heading">
+          <p class="eyebrow" id="mapTitle">Mapa vivo</p>
+          <h2 id="mapSectionTitle">Granada encendida en el mundo</h2>
         </div>
 
         <div class="map-shell">
-          <div class="map-controls" aria-label="Controles del mapa">
-            <button class="icon-button map-control" id="zoomIn" type="button" aria-label="Acercar">+</button>
-            <button class="icon-button map-control" id="zoomOut" type="button" aria-label="Alejar">-</button>
-            <button class="icon-button map-control reset" id="zoomReset" type="button" aria-label="Restablecer zoom">1:1</button>
+          <div class="map-toolbar">
+            <p><span id="approvedCount">0</span> luces aprobadas en <span id="countryCount">0</span> paises</p>
+            <div class="filters" role="group" aria-label="Filtros de emocion">
+              <button class="chip active" type="button" data-filter="all">Todas</button>
+              <button class="chip" type="button" data-filter="nostalgia">Nostalgia</button>
+              <button class="chip" type="button" data-filter="pertenencia">Pertenencia</button>
+              <button class="chip" type="button" data-filter="asombro">Asombro</button>
+              <button class="chip" type="button" data-filter="futuro">Futuro</button>
+            </div>
           </div>
-          <canvas id="worldMap" width="1400" height="760" aria-label="Mapamundi interactivo"></canvas>
-          <div class="map-hint" id="mapHint">Rueda para acercar, arrastra para moverte y haz clic en una luz.</div>
+
+          <div class="map-canvas-wrap">
+            <div class="map-controls" aria-label="Controles del mapa">
+              <button class="icon-button map-control" id="zoomIn" type="button" aria-label="Acercar">+</button>
+              <button class="icon-button map-control" id="zoomOut" type="button" aria-label="Alejar">-</button>
+              <button class="icon-button map-control reset" id="zoomReset" type="button" aria-label="Restablecer zoom">1:1</button>
+            </div>
+            <canvas id="worldMap" width="1400" height="760" aria-label="Mapamundi interactivo"></canvas>
+            <div class="map-hint" id="mapHint">Rueda para acercar, arrastra para moverte y haz clic en una luz.</div>
+          </div>
         </div>
       </section>
 
