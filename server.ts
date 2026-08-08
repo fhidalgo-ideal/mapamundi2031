@@ -350,6 +350,41 @@ function validAdminToken(token: string | null): boolean {
   return timingSafeEqual(received, expected) && Number(payload.exp ?? 0) > Math.floor(Date.now() / 1000);
 }
 
+function sniffImageSignature(headerBytes: Uint8Array): string | null {
+  // JPEG: FF D8
+  if (headerBytes[0] === 0xff && headerBytes[1] === 0xd8) {
+    return "image/jpeg";
+  }
+
+  // PNG: 89 50 4E 47
+  if (
+    headerBytes[0] === 0x89 &&
+    headerBytes[1] === 0x50 &&
+    headerBytes[2] === 0x4e &&
+    headerBytes[3] === 0x47
+  ) {
+    return "image/png";
+  }
+
+  // WEBP: RIFF (at 0-3) + size (4-7) + WEBP (at 8-11)
+  if (
+    headerBytes[0] === 0x52 && // R
+    headerBytes[1] === 0x49 && // I
+    headerBytes[2] === 0x46 && // F
+    headerBytes[3] === 0x46 && // F
+    headerBytes[8] === 0x57 && // W
+    headerBytes[9] === 0x45 && // E
+    headerBytes[10] === 0x42 && // B
+    headerBytes[11] === 0x50 // P
+  ) {
+    return "image/webp";
+  }
+
+  return null;
+}
+
+
+
 function demoSvg(label: string, colorA: string, colorB: string): Uint8Array {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
   <defs>
@@ -534,10 +569,19 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   }
 
   const mediaType = photo.type;
-  const extension = ALLOWED_IMAGE_TYPES[mediaType];
-  if (!extension) {
+  if (!ALLOWED_IMAGE_TYPES[mediaType]) {
     return errorResponse("Formato no permitido. Usa JPG, PNG o WEBP.");
   }
+
+  // Validate binary signature independently of Content-Type/extension
+  const headerBytes = new Uint8Array(await photo.arrayBuffer());
+  const sniffedType = sniffImageSignature(headerBytes);
+  if (!sniffedType) {
+    return errorResponse("La fotografia no tiene un formato valido (JPG, PNG o WEBP).");
+  }
+
+  // Use sniffed type for extension to ensure content/extension alignment
+  const extension = ALLOWED_IMAGE_TYPES[sniffedType]!;
 
   const traceId = randomUUID();
   const fileName = `${traceId}${extension}`;
