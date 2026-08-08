@@ -115,7 +115,7 @@ having its EXIF metadata stripped.
   [number, number]` in `server.ts`: parses width/height from the JPEG SOF header, PNG `IHDR`
   chunk, and WEBP `VP8`/`VP8L`/`VP8X` chunk without decoding the full image; reject in
   `handleCreateTrace` if it exceeds a configured maximum (e.g. 6000x6000 px).
-- [ ] T007 [US2] (depends on T006) Add `stripExif(data: Uint8Array, kind: string): Uint8Array` in
+- [X] T007 [US2] (depends on T006) Add `stripExif(data: Uint8Array, kind: string): Uint8Array` in
   `server.ts`: removes the JPEG `APP1`/EXIF segment, the PNG `eXIf` chunk, and the WEBP `EXIF`
   chunk before writing the file to `uploads/`; safe no-op if the format carries no EXIF.
 - [ ] T008 [US2] (depends on T007) Extend `tests/smoke.test.ts` with binary fixtures: a

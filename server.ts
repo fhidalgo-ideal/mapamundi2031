@@ -486,6 +486,182 @@ function readImageDimensions(data: Uint8Array, kind: string): [number, number] {
   return [0, 0];
 }
 
+
+// Removes EXIF metadata (which routinely carries GPS coordinates, device
+// serials and timestamps) from a validated image before it is persisted. Works
+// straight on the container bytes, WITHOUT re-encoding pixels: drop the JPEG
+// APP1/Exif segment, the PNG eXIf chunk and the WEBP EXIF chunk. Returns the
+// input unchanged when the format carries no EXIF, so it is a safe no-op.
+function stripExif(data: Uint8Array, kind: string): Uint8Array {
+  const concat = (pieces: Uint8Array[]): Uint8Array => {
+    let total = 0;
+    for (const piece of pieces) total += piece.length;
+    const result = new Uint8Array(total);
+    let pos = 0;
+    for (const piece of pieces) {
+      result.set(piece, pos);
+      pos += piece.length;
+    }
+    return result;
+  };
+
+  if (kind === "image/jpeg") {
+    // SOI (FF D8) then marker segments. Copy everything verbatim except APP1
+    // (FF E1) segments whose payload begins with the ASCII bytes "Exif" plus
+    // two NUL bytes. Stop scanning at SOS (FF DA), where entropy-coded scan
+    // data begins, and copy the remainder unchanged.
+    if (data.length < 2 || data[0] !== 0xff || data[1] !== 0xd8) return data;
+    const pieces: Uint8Array[] = [data.subarray(0, 2)];
+    let offset = 2;
+    let removed = false;
+    while (offset + 1 < data.length) {
+      if (data[offset] !== 0xff) {
+        pieces.push(data.subarray(offset));
+        offset = data.length;
+        break;
+      }
+      // Collapse fill bytes (runs of 0xFF) preceding the marker id.
+      let markerPos = offset;
+      let marker = data[markerPos + 1];
+      while (marker === 0xff && markerPos + 2 < data.length) {
+        markerPos++;
+        marker = data[markerPos + 1];
+      }
+      // Standalone markers with no payload: TEM (0x01), RSTn/SOI/EOI (D0-D9).
+      if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+        pieces.push(data.subarray(offset, markerPos + 2));
+        offset = markerPos + 2;
+        continue;
+      }
+      // SOS: entropy data runs to EOI; copy the remainder verbatim.
+      if (marker === 0xda) {
+        pieces.push(data.subarray(offset));
+        offset = data.length;
+        break;
+      }
+      const lenPos = markerPos + 2;
+      if (lenPos + 1 >= data.length) {
+        pieces.push(data.subarray(offset));
+        offset = data.length;
+        break;
+      }
+      const segLen = (data[lenPos] << 8) | data[lenPos + 1];
+      const segEnd = lenPos + segLen;
+      if (segLen < 2 || segEnd > data.length) {
+        pieces.push(data.subarray(offset));
+        offset = data.length;
+        break;
+      }
+      const payloadStart = lenPos + 2;
+      const isExifApp1 =
+        marker === 0xe1 &&
+        data[payloadStart] === 0x45 && // E
+        data[payloadStart + 1] === 0x78 && // x
+        data[payloadStart + 2] === 0x69 && // i
+        data[payloadStart + 3] === 0x66 && // f
+        data[payloadStart + 4] === 0x00 &&
+        data[payloadStart + 5] === 0x00;
+      if (isExifApp1) {
+        removed = true;
+      } else {
+        pieces.push(data.subarray(offset, segEnd));
+      }
+      offset = segEnd;
+    }
+    return removed ? concat(pieces) : data;
+  }
+
+  if (kind === "image/png") {
+    // 8-byte signature, then chunks: [len:4][type:4][data:len][crc:4]. Drop any
+    // eXIf chunk; copy the rest verbatim (CRCs of kept chunks stay valid).
+    if (data.length < 8) return data;
+    const pieces: Uint8Array[] = [data.subarray(0, 8)];
+    let offset = 8;
+    let removed = false;
+    while (offset + 8 <= data.length) {
+      const len =
+        ((data[offset] << 24) |
+          (data[offset + 1] << 16) |
+          (data[offset + 2] << 8) |
+          data[offset + 3]) >>>
+        0;
+      const type = String.fromCharCode(
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
+      );
+      const chunkEnd = offset + 12 + len;
+      if (chunkEnd > data.length) break;
+      if (type === "eXIf") {
+        removed = true;
+      } else {
+        pieces.push(data.subarray(offset, chunkEnd));
+      }
+      offset = chunkEnd;
+      if (type === "IEND") break;
+    }
+    if (offset < data.length) pieces.push(data.subarray(offset));
+    return removed ? concat(pieces) : data;
+  }
+
+  if (kind === "image/webp") {
+    // RIFF (0-3) size (4-7) WEBP (8-11), then chunks: [fourcc:4][size:4][data]
+    // padded to an even byte. Drop the EXIF chunk, then rewrite the RIFF size
+    // and clear the VP8X EXIF flag so the container stays self-consistent.
+    if (data.length < 12) return data;
+    const pieces: Uint8Array[] = [data.subarray(0, 12)];
+    let offset = 12;
+    let removed = false;
+    while (offset + 8 <= data.length) {
+      const fourcc = String.fromCharCode(
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+      );
+      const size =
+        (data[offset + 4] |
+          (data[offset + 5] << 8) |
+          (data[offset + 6] << 16) |
+          (data[offset + 7] << 24)) >>>
+        0;
+      const chunkEnd = offset + 8 + size + (size & 1); // chunks are even-padded
+      if (chunkEnd > data.length) break;
+      if (fourcc === "EXIF") {
+        removed = true;
+      } else {
+        pieces.push(data.subarray(offset, chunkEnd));
+      }
+      offset = chunkEnd;
+    }
+    if (offset < data.length) pieces.push(data.subarray(offset));
+    if (!removed) return data;
+    const result = concat(pieces);
+    // RIFF chunk size = total file length - 8, little-endian at bytes 4-7.
+    const riffSize = result.length - 8;
+    result[4] = riffSize & 0xff;
+    result[5] = (riffSize >>> 8) & 0xff;
+    result[6] = (riffSize >>> 16) & 0xff;
+    result[7] = (riffSize >>> 24) & 0xff;
+    // Extended (VP8X) headers advertise EXIF presence in a flags byte at the
+    // start of the VP8X payload (offset 20, bit 0x08); clear it now that the
+    // chunk is gone so decoders do not go looking for it.
+    if (
+      result.length >= 21 &&
+      result[12] === 0x56 && // V
+      result[13] === 0x50 && // P
+      result[14] === 0x38 && // 8
+      result[15] === 0x58 // X
+    ) {
+      result[20] &= ~0x08;
+    }
+    return result;
+  }
+
+  return data;
+}
+
 function demoSvg(label: string, colorA: string, colorB: string): Uint8Array {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
   <defs>
@@ -700,7 +876,10 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   const traceId = randomUUID();
   const fileName = `${traceId}${extension}`;
   const destination = join(UPLOAD_DIR, fileName);
-  await Bun.write(destination, photo);
+  // Persist the sanitized bytes: strip EXIF (GPS/device metadata) before it
+  // ever touches disk, so uploads/ never leaks contributor location data.
+  const sanitized = stripExif(headerBytes, sniffedType);
+  await Bun.write(destination, sanitized);
 
   const [lat, lng] = resolveCoordinates(values.city, values.country);
   const trace = {
