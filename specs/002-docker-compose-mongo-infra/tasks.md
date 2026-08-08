@@ -44,9 +44,12 @@ This module is not used by anything yet — that's T002. Ship it with its own is
 (`api/tests/db.test.ts`) covering both backends (Mongo tests behind
 `test.skipIf(!process.env.GRANADA_TEST_MONGO_URI)`, same as the strategy in `plan.md`).
 
-**Done when**: `bun test` passes (existing 31 + new db.ts tests), `bunx tsc --noEmit` (or
-equivalent typecheck the repo uses) is clean, and `api/db.ts` exports exactly the function
-signatures listed in `plan.md`.
+**Done when**: `bun test` passes (existing 31 smoke tests + new 8 db.ts SQLite tests), `api/db.ts`
+exports exactly the function signatures listed in `plan.md`, and the MongoDB backend code is
+syntactically complete but runtime-verified later in T002 (when integrated with `api/server.ts`
+against a real Mongo instance). **Known limitation**: mongodb was downgraded from 7.5.0 to 6.21.0
+for Bun 1.3.14 compatibility; the Mongo branch of db.ts has not been runtime-tested against 6.21.0
+yet. T002's manual test will confirm API parity.
 
 ## T002 — P1, hard — Wire `api/server.ts` to use `api/db.ts` (depends on T001)
 
