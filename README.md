@@ -18,11 +18,30 @@ SQLite is the right choice for this phase: it needs no separate database service
 
 For a production phase with thousands of contributions, advanced geo search, analytics, or multi-user administration, the natural migration path is PostgreSQL with PostGIS and image storage in S3/MinIO.
 
+## Project layout
+
+Each concern lives in its own top-level folder:
+
+```text
+web/     # public site: index.html, app.js, styles.css, politica-de-privacidad.html, aviso-legal.html
+admin/   # admin review panel: admin.html, admin.js
+api/     # backend: server.ts and its test suite (api/tests/smoke.test.ts)
+config.json   # public config (versioned)
+.dev          # admin secrets (git-ignored)
+data/         # SQLite database (runtime state)
+uploads/      # uploaded images (runtime state)
+```
+
+The site still runs as a single Bun process (`api/server.ts`'s `Bun.serve`), which serves the
+static files from `web/` and `admin/` and exposes the `/api/*` endpoints. Backend source under
+`api/`, the `.dev` secrets file, and everything else outside the allowlisted static assets are
+never reachable over HTTP.
+
 ## Running on Ubuntu 22.04
 
 ```bash
 cd /path/to/project
-bun run server.ts --host 0.0.0.0 --port 8080
+bun run api/server.ts --host 0.0.0.0 --port 8080
 ```
 
 Open:
@@ -37,23 +56,23 @@ Locally, if you're working on the machine itself:
 http://localhost:8080
 ```
 
-Important: don't open `index.html` by double-clicking it or via a separate static server. Photo uploads need this same application served from `server.ts`, because that's where the API, SQLite, and the `uploads/` folder live.
+Important: don't open `web/index.html` by double-clicking it or via a separate static server. Photo uploads need this same application served from `api/server.ts`, because that's where the API, SQLite, and the `uploads/` folder live.
 
 ## Testing
 
-The project has a single test file, `tests/smoke.test.ts`, run with Bun's built-in test runner:
+The project has a single test file, `api/tests/smoke.test.ts`, run with Bun's built-in test runner:
 
 ```bash
 bun test
 ```
 
-It spawns `server.ts` as a real child process on an OS-assigned ephemeral port, pointed at a
+It spawns `api/server.ts` as a real child process on an OS-assigned ephemeral port, pointed at a
 throwaway temp directory (via `GRANADA_DATA_DIR`, `GRANADA_UPLOAD_DIR`, `GRANADA_DB_PATH`,
 `GRANADA_CONFIG_PATH`, `GRANADA_SECRETS_PATH`), and drives it over HTTP with `fetch`. It never
 touches `data/`, `uploads/`, `config.json`, or `.dev` in the project root. `bun test` exits
 non-zero with a clear failure message if any check fails — no extra flags needed.
 
-Extend `tests/smoke.test.ts` (don't add new test files) as new endpoints or behaviors land.
+Extend `api/tests/smoke.test.ts` (don't add new test files) as new endpoints or behaviors land.
 
 ## Admin password
 
@@ -150,7 +169,7 @@ If `https://mapamundi.2031granadaideal.es/api/health` returns 404, Nginx isn't f
 
 ## Recommended Nginx configuration
 
-Use Nginx as a full proxy in front of `server.ts`. Don't serve `index.html` directly from Nginx in this MVP, since the API lives on the same Bun server.
+Use Nginx as a full proxy in front of `api/server.ts`. Don't serve `web/index.html` directly from Nginx in this MVP, since the API lives on the same Bun server.
 
 ```nginx
 server {
@@ -245,7 +264,7 @@ This also works:
 https://mapamundi.2031granadaideal.es/admin/
 ```
 
-The public homepage doesn't surface the admin entry point. The review screen lives in `admin.html`, served from `/admin`. `admin/index.html` is also included as a compatibility redirect in case the server treats `/admin/` as a static folder.
+The public homepage doesn't surface the admin entry point. The review screen lives in `admin/admin.html`, served from `/admin` (and `/admin/`), which the server maps to that file directly.
 
 Don't open routes like `/api/admin` or `/api/admin/login` directly; they're internal endpoints for the form.
 
@@ -253,7 +272,7 @@ If `/admin/` returns "File not found", check on the server:
 
 ```bash
 ls -la /var/www/mapamundi/admin/
-ls -la /var/www/mapamundi/admin.html
+ls -la /var/www/mapamundi/admin/admin.html
 sudo systemctl restart mapamundi
 ```
 
@@ -278,7 +297,7 @@ If a photo upload triggers a request or API error, check:
 1. That the server is running:
 
 ```bash
-bun run server.ts --host 0.0.0.0 --port 8080
+bun run api/server.ts --host 0.0.0.0 --port 8080
 ```
 
 2. That you opened the site from the server's URL:

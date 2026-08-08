@@ -4,12 +4,18 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 
+// server.ts lives in api/; BASE_DIR is that folder, ROOT_DIR is the repo root.
+// Runtime state (data/, uploads/, config.json, .dev) and the static folders
+// (web/, admin/) all live at ROOT_DIR, not alongside the backend source.
 const BASE_DIR = dirname(import.meta.path);
-const DATA_DIR = process.env.GRANADA_DATA_DIR ?? join(BASE_DIR, "data");
-const UPLOAD_DIR = process.env.GRANADA_UPLOAD_DIR ?? join(BASE_DIR, "uploads");
+const ROOT_DIR = resolve(BASE_DIR, "..");
+const WEB_DIR = join(ROOT_DIR, "web");
+const ADMIN_DIR = join(ROOT_DIR, "admin");
+const DATA_DIR = process.env.GRANADA_DATA_DIR ?? join(ROOT_DIR, "data");
+const UPLOAD_DIR = process.env.GRANADA_UPLOAD_DIR ?? join(ROOT_DIR, "uploads");
 const DB_PATH = process.env.GRANADA_DB_PATH ?? join(DATA_DIR, "granada2031.sqlite3");
-const CONFIG_PATH = process.env.GRANADA_CONFIG_PATH ?? join(BASE_DIR, "config.json");
-const SECRETS_PATH = process.env.GRANADA_SECRETS_PATH ?? join(BASE_DIR, ".dev");
+const CONFIG_PATH = process.env.GRANADA_CONFIG_PATH ?? join(ROOT_DIR, "config.json");
+const SECRETS_PATH = process.env.GRANADA_SECRETS_PATH ?? join(ROOT_DIR, ".dev");
 const APP_VERSION = "2026-05-07-config-footer";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = Number(process.env.GRANADA_MAX_IMAGE_DIMENSION ?? 6000);
@@ -1218,18 +1224,40 @@ function handleDemoImage(path: string): Response {
   return new Response(body, { headers: { "Content-Type": "image/svg+xml; charset=utf-8" } });
 }
 
-// Explicit allowlist: never serve static files outside these paths, so .dev
-// (secrets), server.ts (source code), and everything else in BASE_DIR stays
-// unreachable just by virtue of living in the project directory.
-const PUBLIC_FILES = new Set(["/index.html", "/admin.html", "/app.js", "/admin.js", "/styles.css", "/config.json", "/politica-de-privacidad.html", "/aviso-legal.html"]);
-const PUBLIC_DIRS = ["/admin/", "/uploads/", "/assets/"];
+// Explicit allowlist: every URL below maps to one specific on-disk folder, so
+// the backend source under api/, the .dev secrets file, and everything else in
+// ROOT_DIR stays unreachable just by virtue of living in the project directory.
+const WEB_FILES: Record<string, true> = {
+  "/index.html": true,
+  "/app.js": true,
+  "/styles.css": true,
+  "/politica-de-privacidad.html": true,
+  "/aviso-legal.html": true,
+};
+const ADMIN_FILES: Record<string, true> = { "/admin.html": true, "/admin.js": true };
+const ROOT_FILES: Record<string, true> = { "/config.json": true };
+// Public directory prefixes served from web/ (e.g. logos under /assets/).
+const WEB_DIRS = ["/assets/"];
+
+// Confine a resolved path to its base dir, defeating traversal via `..`.
+function confineToDir(baseDir: string, cleaned: string): string | null {
+  const segments = normalize(cleaned)
+    .split("/")
+    .filter((segment) => segment && segment !== "." && segment !== "..");
+  const resolved = resolve(baseDir, ...segments);
+  const baseWithSep = resolve(baseDir) + sep;
+  if (resolved !== resolve(baseDir) && !resolved.startsWith(baseWithSep)) {
+    return null;
+  }
+  return resolved;
+}
 
 function resolveStaticPath(pathname: string): string | null {
   let cleaned = decodeURIComponent(pathname);
   if (cleaned.endsWith("/")) cleaned += "index.html";
 
   // /uploads/* resolves against UPLOAD_DIR (which GRANADA_UPLOAD_DIR can move
-  // outside BASE_DIR, e.g. for isolated tests), not against the project root.
+  // outside ROOT_DIR, e.g. for isolated tests), not against the project root.
   if (cleaned.startsWith("/uploads/")) {
     const segments = normalize(cleaned.slice("/uploads/".length))
       .split("/")
@@ -1240,18 +1268,16 @@ function resolveStaticPath(pathname: string): string | null {
     return resolved;
   }
 
-  const isAllowed = PUBLIC_FILES.has(cleaned) || PUBLIC_DIRS.some((dir) => cleaned.startsWith(dir));
-  if (!isAllowed) return null;
-
-  const segments = normalize(cleaned)
-    .split("/")
-    .filter((segment) => segment && segment !== "." && segment !== "..");
-  const resolved = resolve(BASE_DIR, ...segments);
-  const baseWithSep = resolve(BASE_DIR) + sep;
-  if (resolved !== resolve(BASE_DIR) && !resolved.startsWith(baseWithSep)) {
-    return null;
+  if (WEB_FILES[cleaned] || WEB_DIRS.some((dir) => cleaned.startsWith(dir))) {
+    return confineToDir(WEB_DIR, cleaned);
   }
-  return resolved;
+  if (ADMIN_FILES[cleaned]) {
+    return confineToDir(ADMIN_DIR, cleaned);
+  }
+  if (ROOT_FILES[cleaned]) {
+    return confineToDir(ROOT_DIR, cleaned);
+  }
+  return null;
 }
 
 async function serveStatic(pathname: string): Promise<Response> {

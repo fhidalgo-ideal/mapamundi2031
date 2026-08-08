@@ -617,6 +617,36 @@ describe("smoke", () => {
     const legalBody = await legalResponse.text();
     expect(legalBody.length).toBeGreaterThan(0);
   });
+
+  test("GET / and GET /admin serve the public site and admin panel after the web/api/admin split", async () => {
+    const homeResponse = await fetch(`${baseUrl}/`);
+    expect(homeResponse.status).toBe(200);
+    const homeBody = await homeResponse.text();
+    expect(homeBody).toContain("app.js");
+
+    const adminResponse = await fetch(`${baseUrl}/admin`);
+    expect(adminResponse.status).toBe(200);
+    const adminBody = await adminResponse.text();
+    expect(adminBody).toContain("admin.js");
+
+    // Trailing-slash variant keeps working (compatibility redirect consolidated).
+    const adminSlashResponse = await fetch(`${baseUrl}/admin/`);
+    expect(adminSlashResponse.status).toBe(200);
+  });
+
+  test("backend source under api/ and the .dev secrets file are never servable over HTTP", async () => {
+    const forbidden = [
+      "/server.ts",
+      "/api/server.ts",
+      "/api/tests/smoke.test.ts",
+      "/.dev",
+      "/config.json/../.dev",
+    ];
+    for (const path of forbidden) {
+      const response = await fetch(`${baseUrl}${path}`);
+      expect(response.status).toBe(404);
+    }
+  });
   test("GET /, GET /api/health, and GET /api/traces include security headers", async () => {
     const securityHeaders = {
       "X-Content-Type-Options": "nosniff",
