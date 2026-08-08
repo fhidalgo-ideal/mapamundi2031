@@ -1223,6 +1223,24 @@ textarea {
   margin: 12px 0;
 }
 
+.review-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.review-search {
+  background: #0e1728;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  flex: 1 1 260px;
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
 .review-list {
   display: grid;
   gap: 12px;
@@ -1289,6 +1307,11 @@ textarea {
 .status-badge.approved {
   background: rgba(156, 207, 107, 0.18);
   color: #c8ee9f;
+}
+
+.status-badge.rejected {
+  background: rgba(242, 109, 91, 0.18);
+  color: var(--coral);
 }
 
 .edit-form {

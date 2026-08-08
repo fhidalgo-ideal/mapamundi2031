@@ -67,6 +67,21 @@
             <span>pendientes</span>
             <button class="text-button hidden" id="adminLogout" type="button">Cerrar sesion</button>
           </div>
+          <div class="review-controls">
+            <input
+              type="search"
+              id="reviewSearch"
+              class="review-search"
+              placeholder="Buscar por nombre, ciudad, pais o email"
+              aria-label="Buscar contribuciones"
+            >
+            <div class="filters" role="group" aria-label="Filtro de estado">
+              <button class="chip active" type="button" data-status-filter="all">Todas</button>
+              <button class="chip" type="button" data-status-filter="pending">Pendientes</button>
+              <button class="chip" type="button" data-status-filter="approved">Aprobadas</button>
+              <button class="chip" type="button" data-status-filter="rejected">Rechazadas</button>
+            </div>
+          </div>
           <div class="review-list" id="reviewList"></div>
         </div>
       </section>
@@ -100,6 +115,6 @@
       </article>
     </template>
 
-    <script src="admin.js?v=20260808-admin-charts"></script>
+    <script src="admin.js?v=20260808-review-filters"></script>
   </body>
 </html>

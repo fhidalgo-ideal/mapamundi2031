@@ -15,8 +15,12 @@ const chartByDate = document.querySelector("#chartByDate");
 const chartByPlace = document.querySelector("#chartByPlace");
 const chartByPlaceTitle = document.querySelector("#chartByPlaceTitle");
 const chartToggleButtons = document.querySelectorAll(".chart-toggle-btn");
+const reviewSearchInput = document.querySelector("#reviewSearch");
+const statusFilterButtons = document.querySelectorAll("[data-status-filter]");
 let chartGroupBy = "country";
 let chartDefaultsSet = false;
+let reviewSearchQuery = "";
+let reviewStatusFilter = "all";
 
 async function apiRequest(path, options = {}) {
   let response;
@@ -61,6 +65,14 @@ function renderAdmin() {
   adminLogout.classList.toggle("hidden", !adminToken);
   renderReviewList();
   renderCharts();
+}
+
+function normalize(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function pad2(value) {
@@ -219,6 +231,20 @@ function renderPlaceChart(traces) {
   chartByPlace.innerHTML = `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Contribuciones por ${groupLabel}">${rows}</svg>`;
 }
 
+const STATUS_LABELS = {
+  pending: "Pendiente",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+};
+
+function matchesReviewSearch(trace, normalizedQuery) {
+  if (!normalizedQuery) return true;
+  const haystack = [trace.name, trace.city, trace.country, trace.email]
+    .map((value) => normalize(value || ""))
+    .join(" ");
+  return haystack.includes(normalizedQuery);
+}
+
 function renderReviewList() {
   reviewList.innerHTML = "";
   if (!adminToken) {
@@ -226,11 +252,18 @@ function renderReviewList() {
     return;
   }
 
-  const visible = adminTraces.filter((trace) => trace.status === "pending" || trace.status === "approved");
+  const normalizedQuery = normalize(reviewSearchQuery);
+  const hasActiveFilters = reviewStatusFilter !== "all" || normalizedQuery.length > 0;
+  const visible = adminTraces.filter((trace) => {
+    const matchesStatus = reviewStatusFilter === "all" || trace.status === reviewStatusFilter;
+    return matchesStatus && matchesReviewSearch(trace, normalizedQuery);
+  });
   const template = document.querySelector("#reviewItemTemplate");
 
   if (visible.length === 0) {
-    reviewList.innerHTML = `<p class="empty-state">No hay contribuciones para revisar.</p>`;
+    reviewList.innerHTML = hasActiveFilters
+      ? `<p class="empty-state">No hay contribuciones que coincidan con la busqueda.</p>`
+      : `<p class="empty-state">No hay contribuciones para revisar.</p>`;
     return;
   }
 
@@ -251,7 +284,7 @@ function renderReviewList() {
       extraImage.alt = `Foto adicional ${index + 2} de ${trace.name}`;
       extraPhotos.appendChild(extraImage);
     });
-    node.querySelector(".status-badge").textContent = trace.status === "approved" ? "Aprobada" : "Pendiente";
+    node.querySelector(".status-badge").textContent = STATUS_LABELS[trace.status] || trace.status;
     node.querySelector(".status-badge").className = `status-badge ${trace.status}`;
     node.querySelector("h3").textContent = `${trace.name} - ${trace.city}, ${trace.country}`;
     node.querySelector("p").textContent = trace.feeling;
@@ -368,6 +401,18 @@ chartToggleButtons.forEach((button) => {
       ? "Contribuciones por pais"
       : "Contribuciones por ciudad";
     renderCharts();
+  });
+});
+
+reviewSearchInput.addEventListener("input", () => {
+  reviewSearchQuery = reviewSearchInput.value;
+  renderReviewList();
+});
+statusFilterButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    reviewStatusFilter = button.dataset.statusFilter;
+    statusFilterButtons.forEach((other) => other.classList.toggle("active", other === button));
+    renderReviewList();
   });
 });
 
