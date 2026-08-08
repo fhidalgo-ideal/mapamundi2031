@@ -197,7 +197,7 @@ attempts per IP.
 - [X] T017 [US5] (depends on T016) Apply per-IP lockout to `POST /api/admin/login`, reusing the
   rate-limiter structure from T003 (failure counter per IP, e.g. max 5 failed attempts in 15
   minutes → `429` until it expires, even with the correct password).
-- [ ] T018 [US5] (depends on T017) Extend `tests/smoke.test.ts`: an admin action (e.g. approving
+- [x] T018 [US5] (depends on T017) Extend `tests/smoke.test.ts`: an admin action (e.g. approving
   a contribution) appears in `GET /api/admin/audit-log`; exceeding the max failed login attempts
   blocks further attempts with `429`.
 

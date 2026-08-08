@@ -637,4 +637,93 @@ describe("smoke", () => {
       }
     }
   });
+
+  test("GET /api/admin/audit-log shows admin actions (approval)", async () => {
+    // T018: Every admin action, including approval, must appear in the audit log
+    // with the correct action name and trace_id.
+    // We create and approve a new trace, then verify the entry appears in the log.
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const clientIp = "203.0.113.100"; // Distinct IP
+
+    const form = new FormData();
+    form.set("name", "Audit Log Test");
+    form.set("email", "audit-test@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Testing audit log recording.");
+    form.set("consent", "true");
+    form.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const createResponse = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": clientIp },
+      body: form,
+    });
+    expect(createResponse.status).toBe(201);
+    const createBody = await createResponse.json();
+    const auditTraceId = createBody.trace.id;
+
+    // Approve the trace as admin
+    const approveResponse = await fetch(`${baseUrl}/api/admin/traces/${auditTraceId}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    expect(approveResponse.status).toBe(200);
+
+    // Check that the approval action appears in the audit log
+    const auditResponse = await fetch(`${baseUrl}/api/admin/audit-log`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(auditResponse.status).toBe(200);
+    const auditBody = await auditResponse.json();
+    expect(Array.isArray(auditBody.entries)).toBe(true);
+    expect(auditBody.total).toBeGreaterThanOrEqual(1);
+
+    // Find the update_status entry for this specific trace
+    const updateStatusEntry = auditBody.entries.find(
+      (entry: { action: string; traceId: string }) =>
+        entry.action === "update_status" && entry.traceId === auditTraceId,
+    );
+    expect(updateStatusEntry).toBeTruthy();
+    expect(updateStatusEntry.action).toBe("update_status");
+    expect(updateStatusEntry.traceId).toBe(auditTraceId);
+  });
+
+  test("POST /api/admin/login returns 429 after exceeding max failed attempts", async () => {
+    // T018: Exceeding the max failed login attempts per IP (5) within the lockout
+    // window (15 min) should block further attempts with 429.
+    const wrongPassword = "definitely-not-the-correct-password";
+    const lockoutTestIp = "203.0.113.110"; // Distinct IP to isolate lockout state
+
+    // Attempt login 5 times with wrong password (max allowed before lockout)
+    for (let i = 1; i <= 5; i++) {
+      const response = await fetch(`${baseUrl}/api/admin/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forwarded-For": lockoutTestIp,
+        },
+        body: JSON.stringify({ password: wrongPassword }),
+      });
+      expect(response.status).toBe(401);
+    }
+
+    // 6th attempt should be blocked with 429
+    const lockedResponse = await fetch(`${baseUrl}/api/admin/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Forwarded-For": lockoutTestIp,
+      },
+      body: JSON.stringify({ password: wrongPassword }),
+    });
+    expect(lockedResponse.status).toBe(429);
+    expect(lockedResponse.headers.get("Retry-After")).toBeTruthy();
+  });
 });
