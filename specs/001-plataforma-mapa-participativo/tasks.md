@@ -189,7 +189,7 @@ attempts per IP.
 
 **Independent Test**: See spec.md US5.
 
-- [ ] T016 [US5] (depends on T015) Add an `audit_log` table (id, action, trace_id, source_ip,
+- [X] T016 [US5] (depends on T015) Add an `audit_log` table (id, action, trace_id, source_ip,
   created_at) via an idempotent migration in `initDb()`; insert a row from `handleUpdateStatus`,
   `handleUpdateTrace`, and `handleDeleteTrace`, and from `handleAdminLogin` (both success and
   failure); add `GET /api/admin/audit-log` (protected with `requireAdmin`), paginated by

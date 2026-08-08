@@ -255,6 +255,15 @@ function initDb() {
   if (!traceColumns.some((col) => col.name === "deletion_token_hash")) {
     db.exec("ALTER TABLE traces ADD COLUMN deletion_token_hash TEXT");
   }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      action TEXT NOT NULL,
+      trace_id TEXT,
+      source_ip TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
   const { count } = db.query("SELECT COUNT(*) as count FROM traces").get() as { count: number };
   if (count === 0) {
     const insert = db.prepare(`
@@ -738,7 +747,65 @@ function handleGetAdminTraces(): Response {
   return jsonResponse({ traces: rows.map(rowToTrace) });
 }
 
-async function handleAdminLogin(request: Request): Promise<Response> {
+interface AuditLogRow {
+  id: string;
+  action: string;
+  trace_id: string | null;
+  source_ip: string;
+  created_at: string;
+}
+
+function rowToAuditLogEntry(row: AuditLogRow) {
+  return {
+    id: row.id,
+    action: row.action,
+    traceId: row.trace_id,
+    sourceIp: row.source_ip,
+    createdAt: row.created_at,
+  };
+}
+
+// Best-effort audit trail: an admin action must still succeed even if this
+// insert somehow throws, since losing an audit entry is preferable to
+// failing the action it is meant to record.
+function recordAuditLog(action: string, traceId: string | null, sourceIp: string): void {
+  try {
+    db.prepare(
+      `INSERT INTO audit_log (id, action, trace_id, source_ip, created_at)
+       VALUES ($id, $action, $traceId, $sourceIp, $createdAt)`,
+    ).run({
+      $id: randomUUID(),
+      $action: action,
+      $traceId: traceId,
+      $sourceIp: sourceIp,
+      $createdAt: nowIso(),
+    });
+  } catch (error) {
+    console.error("No se pudo registrar la entrada de auditoria:", error);
+  }
+}
+
+const AUDIT_LOG_DEFAULT_LIMIT = 50;
+const AUDIT_LOG_MAX_LIMIT = 200;
+
+function handleGetAuditLog(request: Request): Response {
+  const url = new URL(request.url);
+  const rawLimit = Number(url.searchParams.get("limit") ?? AUDIT_LOG_DEFAULT_LIMIT);
+  const rawOffset = Number(url.searchParams.get("offset") ?? 0);
+  const limit = Number.isFinite(rawLimit)
+    ? Math.min(Math.max(1, Math.trunc(rawLimit)), AUDIT_LOG_MAX_LIMIT)
+    : AUDIT_LOG_DEFAULT_LIMIT;
+  const offset = Number.isFinite(rawOffset) ? Math.max(0, Math.trunc(rawOffset)) : 0;
+
+  const rows = db
+    .query("SELECT * FROM audit_log ORDER BY datetime(created_at) DESC, rowid DESC LIMIT ? OFFSET ?")
+    .all(limit, offset) as AuditLogRow[];
+  const { total } = db.query("SELECT COUNT(*) as total FROM audit_log").get() as { total: number };
+
+  return jsonResponse({ entries: rows.map(rowToAuditLogEntry), total, limit, offset });
+}
+
+async function handleAdminLogin(request: Request, server?: IpResolvingServer): Promise<Response> {
   let payload: { password?: unknown };
   try {
     payload = await request.json();
@@ -752,9 +819,12 @@ async function handleAdminLogin(request: Request): Promise<Response> {
   const expectedBuf = Buffer.from(expected, "utf-8");
   const matches =
     passwordBuf.length === expectedBuf.length && timingSafeEqual(passwordBuf, expectedBuf);
+  const clientIp = getClientIp(request, server);
   if (!matches) {
+    recordAuditLog("login_failure", null, clientIp);
     return errorResponse("Password de administracion incorrecta.", 401);
   }
+  recordAuditLog("login_success", null, clientIp);
   return jsonResponse({ token: makeAdminToken(), expiresIn: ADMIN_TOKEN_TTL_SECONDS });
 }
 
@@ -953,7 +1023,7 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   return jsonResponse({ trace: rowToTrace(trace as unknown as TraceRow), deletionToken }, 201);
 }
 
-async function handleUpdateStatus(request: Request, traceId: string): Promise<Response> {
+async function handleUpdateStatus(request: Request, traceId: string, server?: IpResolvingServer): Promise<Response> {
   let payload: { status?: unknown };
   try {
     payload = await request.json();
@@ -969,10 +1039,11 @@ async function handleUpdateStatus(request: Request, traceId: string): Promise<Re
     return errorResponse("No existe esa contribucion.", 404);
   }
   const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow;
+  recordAuditLog("update_status", traceId, getClientIp(request, server));
   return jsonResponse({ trace: rowToTrace(row) });
 }
 
-async function handleUpdateTrace(request: Request, traceId: string): Promise<Response> {
+async function handleUpdateTrace(request: Request, traceId: string, server?: IpResolvingServer): Promise<Response> {
   let payload: Record<string, unknown>;
   try {
     payload = await request.json();
@@ -1031,6 +1102,7 @@ async function handleUpdateTrace(request: Request, traceId: string): Promise<Res
     return errorResponse("No existe esa contribucion.", 404);
   }
   const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow;
+  recordAuditLog("update_trace", traceId, getClientIp(request, server));
   return jsonResponse({ trace: rowToTrace(row) });
 }
 
@@ -1055,12 +1127,13 @@ function deleteTraceRow(row: TraceRow): void {
   }
 }
 
-function handleDeleteTrace(traceId: string): Response {
+function handleDeleteTrace(request: Request, traceId: string, server?: IpResolvingServer): Response {
   const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow | undefined;
   if (!row) {
     return errorResponse("No existe esa contribucion.", 404);
   }
   deleteTraceRow(row);
+  recordAuditLog("delete_trace", traceId, getClientIp(request, server));
   return jsonResponse({ deleted: true, id: traceId });
 }
 
@@ -1181,6 +1254,11 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
       if (denied) return denied;
       return handleGetAdminTraces();
     }
+    if (normalizedPath === "/api/admin/audit-log") {
+      const denied = requireAdmin(request);
+      if (denied) return denied;
+      return handleGetAuditLog(request);
+    }
     if (normalizedPath === "/api/admin/login") {
       return errorResponse(
         "El login de administracion debe hacerse desde la web, no abriendo esta URL directamente.",
@@ -1198,7 +1276,7 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
 
   if (request.method === "POST") {
     if (normalizedPath === "/api/admin/login") {
-      return handleAdminLogin(request);
+      return handleAdminLogin(request, server);
     }
     if (normalizedPath === "/api/traces") {
       return handleCreateTrace(request, server);
@@ -1214,13 +1292,13 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
       const denied = requireAdmin(request);
       if (denied) return denied;
       const traceId = normalizedPath.slice("/api/admin/traces/".length, -"/status".length);
-      return handleUpdateStatus(request, traceId);
+      return handleUpdateStatus(request, traceId, server);
     }
     if (normalizedPath.startsWith("/api/admin/traces/")) {
       const denied = requireAdmin(request);
       if (denied) return denied;
       const traceId = normalizedPath.slice("/api/admin/traces/".length);
-      return handleUpdateTrace(request, traceId);
+      return handleUpdateTrace(request, traceId, server);
     }
     if (path.startsWith("/api/")) {
       return errorResponse("Endpoint de API no encontrado.", 404);
@@ -1233,7 +1311,7 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
       const denied = requireAdmin(request);
       if (denied) return denied;
       const traceId = normalizedPath.slice("/api/admin/traces/".length);
-      return handleDeleteTrace(traceId);
+      return handleDeleteTrace(request, traceId, server);
     }
     if (normalizedPath.startsWith("/api/traces/")) {
       const traceId = normalizedPath.slice("/api/traces/".length);
