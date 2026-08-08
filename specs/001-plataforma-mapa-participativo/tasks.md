@@ -111,7 +111,7 @@ having its EXIF metadata stripped.
   signatures for JPEG (`FF D8`), PNG (`89 50 4E 47`), and WEBP (`RIFF....WEBP`), independently of
   the `Content-Type`/extension declared in `handleCreateTrace`; rejects if it matches none of the
   supported signatures.
-- [ ] T006 [US2] (depends on T005) Add `readImageDimensions(data: Uint8Array, kind: string):
+- [X] T006 [US2] (depends on T005) Add `readImageDimensions(data: Uint8Array, kind: string):
   [number, number]` in `server.ts`: parses width/height from the JPEG SOF header, PNG `IHDR`
   chunk, and WEBP `VP8`/`VP8L`/`VP8X` chunk without decoding the full image; reject in
   `handleCreateTrace` if it exceeds a configured maximum (e.g. 6000x6000 px).

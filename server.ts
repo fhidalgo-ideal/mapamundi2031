@@ -12,6 +12,7 @@ const CONFIG_PATH = process.env.GRANADA_CONFIG_PATH ?? join(BASE_DIR, "config.js
 const SECRETS_PATH = process.env.GRANADA_SECRETS_PATH ?? join(BASE_DIR, ".dev");
 const APP_VERSION = "2026-05-07-config-footer";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = Number(process.env.GRANADA_MAX_IMAGE_DIMENSION ?? 6000);
 const ADMIN_TOKEN_TTL_SECONDS = 12 * 60 * 60;
 const TRACE_RATE_LIMIT_MAX = Number(process.env.GRANADA_TRACE_RATE_LIMIT_MAX ?? 5);
 const TRACE_RATE_LIMIT_WINDOW_MS = Number(
@@ -383,7 +384,107 @@ function sniffImageSignature(headerBytes: Uint8Array): string | null {
   return null;
 }
 
+// Parses intrinsic pixel dimensions straight from container headers, WITHOUT
+// decoding the pixel data — the whole point of the anti-decompression-bomb
+// guard. Returns [0, 0] when the header is truncated or unrecognizable so the
+// caller treats it as an invalid image.
+function readImageDimensions(data: Uint8Array, kind: string): [number, number] {
+  const u16be = (o: number): number => (data[o] << 8) | data[o + 1];
+  const u16le = (o: number): number => data[o] | (data[o + 1] << 8);
+  const u24le = (o: number): number =>
+    data[o] | (data[o + 1] << 8) | (data[o + 2] << 16);
 
+  if (kind === "image/jpeg") {
+    // Walk marker segments using each segment's declared length, exactly as a
+    // real JPEG decoder does, until a Start-Of-Frame (SOFn) marker carries the
+    // frame size. Reading the SAME SOF the decoder uses is what makes the guard
+    // sound: an attacker cannot plant a decoy SOF inside another segment's
+    // payload to make us read a small size while the decoder still decodes a
+    // huge (bomb) frame, because we skip segment payloads by their length.
+    let offset = 2; // skip SOI (FF D8)
+    while (offset + 1 < data.length) {
+      if (data[offset] !== 0xff) {
+        offset++;
+        continue;
+      }
+      let marker = data[offset + 1];
+      // Collapse marker padding (runs of 0xFF preceding the marker id).
+      while (marker === 0xff && offset + 1 < data.length) {
+        offset++;
+        marker = data[offset + 1];
+      }
+      offset += 2;
+      // Standalone markers with no payload: TEM (0x01) and RSTn/SOI/EOI
+      // (0xD0-0xD9). Start-Of-Scan (0xDA) means entropy data follows, so any
+      // SOF must already have been seen.
+      if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+        if (marker === 0xda) break;
+        continue;
+      }
+      if (offset + 1 >= data.length) break;
+      const segLen = u16be(offset);
+      // SOF markers 0xC0-0xCF except DHT (0xC4), JPG (0xC8), DAC (0xCC).
+      const isSof =
+        marker >= 0xc0 &&
+        marker <= 0xcf &&
+        marker !== 0xc4 &&
+        marker !== 0xc8 &&
+        marker !== 0xcc;
+      if (isSof) {
+        // segment: [len:2][precision:1][height:2][width:2]
+        if (offset + 6 >= data.length) break;
+        const height = u16be(offset + 3);
+        const width = u16be(offset + 5);
+        return [width, height];
+      }
+      if (segLen < 2) break; // malformed length; avoid an infinite loop
+      offset += segLen;
+    }
+    return [0, 0];
+  }
+
+  if (kind === "image/png") {
+    // 8-byte signature, then IHDR chunk: [len:4]["IHDR":4][width:4][height:4].
+    if (data.length < 24) return [0, 0];
+    const width = (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
+    const height = (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
+    return [width >>> 0, height >>> 0];
+  }
+
+  if (kind === "image/webp") {
+    // RIFF (0-3) size (4-7) WEBP (8-11) then a chunk FourCC at offset 12.
+    if (data.length < 16) return [0, 0];
+    const fourcc = String.fromCharCode(data[12], data[13], data[14], data[15]);
+    if (fourcc === "VP8 ") {
+      // Lossy: frame tag (3) + start code 9D 01 2A (3) then 14-bit dims LE.
+      if (data.length < 30) return [0, 0];
+      const width = u16le(26) & 0x3fff;
+      const height = u16le(28) & 0x3fff;
+      return [width, height];
+    }
+    if (fourcc === "VP8L") {
+      // Lossless: signature 0x2F at 20, then 14-bit (width-1)/(height-1).
+      if (data.length < 25) return [0, 0];
+      const b0 = data[21];
+      const b1 = data[22];
+      const b2 = data[23];
+      const b3 = data[24];
+      const width = 1 + (((b1 & 0x3f) << 8) | b0);
+      const height = 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6));
+      return [width, height];
+    }
+    if (fourcc === "VP8X") {
+      // Extended: 3-byte (canvas width-1) at 24, (canvas height-1) at 27, LE.
+      if (data.length < 30) return [0, 0];
+      const width = 1 + u24le(24);
+      const height = 1 + u24le(27);
+      return [width, height];
+    }
+    return [0, 0];
+  }
+
+  return [0, 0];
+}
 
 function demoSvg(label: string, colorA: string, colorB: string): Uint8Array {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
@@ -578,6 +679,19 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   const sniffedType = sniffImageSignature(headerBytes);
   if (!sniffedType) {
     return errorResponse("La fotografia no tiene un formato valido (JPG, PNG o WEBP).");
+  }
+
+  // Anti decompression-bomb: read intrinsic dimensions from the header only
+  // (no full pixel decode) and reject oversized canvases before persisting.
+  const [imgWidth, imgHeight] = readImageDimensions(headerBytes, sniffedType);
+  if (imgWidth <= 0 || imgHeight <= 0) {
+    return errorResponse("No se pudieron leer las dimensiones de la fotografia.");
+  }
+  if (imgWidth > MAX_IMAGE_DIMENSION || imgHeight > MAX_IMAGE_DIMENSION) {
+    return errorResponse(
+      `La fotografia excede el tamano maximo de ${MAX_IMAGE_DIMENSION}x${MAX_IMAGE_DIMENSION} px.`,
+      413,
+    );
   }
 
   // Use sniffed type for extension to ensure content/extension alignment
