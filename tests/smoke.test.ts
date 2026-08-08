@@ -180,4 +180,106 @@ describe("smoke", () => {
     const ids = body.traces.map((trace: { id: string }) => trace.id);
     expect(ids).toContain(createdTraceId);
   });
+
+  test("POST /api/traces exceeds rate limit and returns 429 after max hits", async () => {
+    // Use a distinct X-Forwarded-For IP to isolate the rate-limit bucket
+    // (the previous test already consumed 1 slot on 127.0.0.1)
+    const clientIp = "203.0.113.10";
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const baseHeaders = {
+      "X-Forwarded-For": clientIp,
+    };
+
+    // Send 5 submissions (at limit) — should all succeed with 201
+    for (let i = 1; i <= 5; i++) {
+      const form = new FormData();
+      form.set("name", `Rate Limit Test #${i}`);
+      form.set("email", `ratelimit${i}@example.com`);
+      form.set("city", "Granada");
+      form.set("country", "Espana");
+      form.set("relation", "Visitante");
+      form.set("emotion", "asombro");
+      form.set("feeling", "Testing rate limit enforcement.");
+      form.set("consent", "true");
+      form.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+      const response = await fetch(`${baseUrl}/api/traces`, {
+        method: "POST",
+        headers: baseHeaders,
+        body: form,
+      });
+      expect(response.status).toBe(201);
+    }
+
+    // 6th submission from same IP should be rejected with 429
+    const finalForm = new FormData();
+    finalForm.set("name", "Rate Limit Test #6");
+    finalForm.set("email", "ratelimit6@example.com");
+    finalForm.set("city", "Granada");
+    finalForm.set("country", "Espana");
+    finalForm.set("relation", "Visitante");
+    finalForm.set("emotion", "asombro");
+    finalForm.set("feeling", "Testing rate limit enforcement.");
+    finalForm.set("consent", "true");
+    finalForm.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: baseHeaders,
+      body: finalForm,
+    });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBeTruthy();
+  });
+
+  test("POST /api/traces with honeypot field filled is rejected without creating a record", async () => {
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const clientIp = "203.0.113.20"; // Distinct IP to avoid rate-limit collision
+    const honeypotEmail = "honeypot@example.com";
+
+    // Count existing traces before the honeypot submission
+    const beforeResponse = await fetch(`${baseUrl}/api/admin/traces`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(beforeResponse.status).toBe(200);
+    const beforeBody = await beforeResponse.json();
+    const beforeCount = beforeBody.traces.length;
+
+    // Submit form with honeypot field filled
+    const form = new FormData();
+    form.set("name", "Honeypot Test");
+    form.set("email", honeypotEmail);
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Testing honeypot field.");
+    form.set("consent", "true");
+    form.set("website", "http://spam-bot.example.com"); // Honeypot field
+    form.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": clientIp },
+      body: form,
+    });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBeTruthy();
+
+    // Verify the record was NOT created by checking admin trace list
+    const afterResponse = await fetch(`${baseUrl}/api/admin/traces`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(afterResponse.status).toBe(200);
+    const afterBody = await afterResponse.json();
+    const afterCount = afterBody.traces.length;
+    expect(afterCount).toBe(beforeCount); // Count should not increase
+
+    // Also verify the honeypot email doesn't appear in admin list
+    const honeypotRecords = afterBody.traces.filter(
+      (trace: { email: string }) => trace.email === honeypotEmail,
+    );
+    expect(honeypotRecords.length).toBe(0);
+  });
 });
