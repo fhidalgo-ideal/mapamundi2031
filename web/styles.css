@@ -199,7 +199,7 @@ nav a:hover {
 }
 
 .eyebrow {
-  color: var(--gold);
+  color: var(--coral);
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -286,7 +286,8 @@ h1 {
 .map-section,
 .submit-section,
 .archive-section,
-.admin-section {
+.admin-section,
+.how-to-contribute {
   padding: 64px clamp(18px, 4vw, 56px);
 }
 
@@ -298,6 +299,48 @@ h1 {
   color: var(--muted);
   line-height: 1.5;
   max-width: 680px;
+}
+
+.step-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  margin: 0 auto;
+  max-width: 1280px;
+}
+
+.step-card {
+  text-align: center;
+}
+
+.step-number {
+  color: var(--coral);
+  font-size: clamp(48px, 8vw, 120px);
+  font-weight: 200;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+  margin-bottom: 16px;
+  opacity: 0.35;
+}
+
+.step-card h3 {
+  font-size: clamp(18px, 2vw, 24px);
+  margin: 0 0 12px 0;
+  font-weight: 800;
+}
+
+.step-card p {
+  color: var(--muted-on-light);
+  font-size: clamp(14px, 1.2vw, 16px);
+  line-height: 1.6;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .step-cards {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
 }
 
 .map-toolbar,
