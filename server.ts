@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Database } from "bun:sqlite";
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 
@@ -248,6 +248,10 @@ function initDb() {
       created_at TEXT NOT NULL
     )
   `);
+  const traceColumns = db.query("PRAGMA table_info(traces)").all() as { name: string }[];
+  if (!traceColumns.some((col) => col.name === "deletion_token_hash")) {
+    db.exec("ALTER TABLE traces ADD COLUMN deletion_token_hash TEXT");
+  }
   const { count } = db.query("SELECT COUNT(*) as count FROM traces").get() as { count: number };
   if (count === 0) {
     const insert = db.prepare(`
@@ -295,6 +299,7 @@ interface TraceRow {
   photo: string;
   status: string;
   created_at: string;
+  deletion_token_hash: string | null;
 }
 
 function rowToTrace(row: TraceRow) {
@@ -882,6 +887,11 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   await Bun.write(destination, sanitized);
 
   const [lat, lng] = resolveCoordinates(values.city, values.country);
+  // Deletion token: returned once in this response and never persisted in
+  // plaintext, so a leaked DB dump alone can't be used to self-delete
+  // someone else's contribution.
+  const deletionToken = base64UrlEncode(randomBytes(32));
+  const deletionTokenHash = hashDeletionToken(deletionToken);
   const trace = {
     id: traceId,
     name: values.name.slice(0, 120),
@@ -897,14 +907,15 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
     status: "pending",
     consent: consentTruthy ? 1 : 0,
     created_at: nowIso(),
+    deletion_token_hash: deletionTokenHash,
   };
 
   db.prepare(
     `INSERT INTO traces (
       id, name, email, city, country, lat, lng, relation, emotion,
-      feeling, photo, status, consent, created_at
+      feeling, photo, status, consent, created_at, deletion_token_hash
     ) VALUES ($id, $name, $email, $city, $country, $lat, $lng, $relation,
-      $emotion, $feeling, $photo, $status, $consent, $created_at)`,
+      $emotion, $feeling, $photo, $status, $consent, $created_at, $deletion_token_hash)`,
   ).run({
     $id: trace.id,
     $name: trace.name,
@@ -920,9 +931,10 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
     $status: trace.status,
     $consent: trace.consent,
     $created_at: trace.created_at,
+    $deletion_token_hash: trace.deletion_token_hash,
   });
 
-  return jsonResponse({ trace: rowToTrace(trace as unknown as TraceRow) }, 201);
+  return jsonResponse({ trace: rowToTrace(trace as unknown as TraceRow), deletionToken }, 201);
 }
 
 async function handleUpdateStatus(request: Request, traceId: string): Promise<Response> {
@@ -1006,12 +1018,12 @@ async function handleUpdateTrace(request: Request, traceId: string): Promise<Res
   return jsonResponse({ trace: rowToTrace(row) });
 }
 
-function handleDeleteTrace(traceId: string): Response {
-  const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow | undefined;
-  if (!row) {
-    return errorResponse("No existe esa contribucion.", 404);
-  }
-  db.prepare("DELETE FROM traces WHERE id = ?").run(traceId);
+function hashDeletionToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function deleteTraceRow(row: TraceRow): void {
+  db.prepare("DELETE FROM traces WHERE id = ?").run(row.id);
 
   if (row.photo.startsWith("/uploads/")) {
     const fileName = row.photo.slice("/uploads/".length);
@@ -1025,7 +1037,37 @@ function handleDeleteTrace(traceId: string): Response {
       }
     }
   }
+}
 
+function handleDeleteTrace(traceId: string): Response {
+  const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow | undefined;
+  if (!row) {
+    return errorResponse("No existe esa contribucion.", 404);
+  }
+  deleteTraceRow(row);
+  return jsonResponse({ deleted: true, id: traceId });
+}
+
+// Public, unauthenticated self-service deletion (GDPR right to erasure): the
+// only proof of ownership is the per-contribution token minted once in
+// handleCreateTrace and never persisted in plaintext. Compared with
+// timingSafeEqual against the stored hash so a wrong guess can't be
+// distinguished by response timing.
+function handleSelfDeleteTrace(request: Request, traceId: string): Response {
+  const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow | undefined;
+  if (!row) {
+    return errorResponse("No existe esa contribucion.", 404);
+  }
+  const providedToken = request.headers.get("X-Deletion-Token") ?? "";
+  if (!providedToken || !row.deletion_token_hash) {
+    return errorResponse("Token de borrado no valido.", 403);
+  }
+  const provided = Buffer.from(hashDeletionToken(providedToken), "utf-8");
+  const stored = Buffer.from(row.deletion_token_hash, "utf-8");
+  if (provided.length !== stored.length || !timingSafeEqual(provided, stored)) {
+    return errorResponse("Token de borrado no valido.", 403);
+  }
+  deleteTraceRow(row);
   return jsonResponse({ deleted: true, id: traceId });
 }
 
@@ -1170,6 +1212,10 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
       if (denied) return denied;
       const traceId = normalizedPath.slice("/api/admin/traces/".length);
       return handleDeleteTrace(traceId);
+    }
+    if (normalizedPath.startsWith("/api/traces/")) {
+      const traceId = normalizedPath.slice("/api/traces/".length);
+      return handleSelfDeleteTrace(request, traceId);
     }
     if (path.startsWith("/api/")) {
       return errorResponse("Endpoint de API no encontrado.", 404);

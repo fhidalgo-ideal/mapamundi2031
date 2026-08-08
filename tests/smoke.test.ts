@@ -4,7 +4,7 @@
 // path end to end. Extend this file (don't add new test files) as new
 // endpoints/behaviors land — see specs/001-plataforma-mapa-participativo/.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Subprocess } from "bun";
@@ -417,5 +417,91 @@ describe("smoke", () => {
     const persistedAscii = Buffer.from(persistedBytes).toString("latin1");
     expect(persistedAscii).not.toContain("Exif");
     expect(persistedAscii).not.toContain("GRANADA-GPS-CANARY-9F3D");
+  });
+
+  test("DELETE /api/traces/{id} deletes the record and photo with the correct X-Deletion-Token", async () => {
+    // T010: the token is minted per-contribution in handleCreateTrace and
+    // returned once in the POST response; only its hash is persisted.
+    const clientIp = "203.0.113.60"; // Distinct IP to avoid rate-limit collision
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const form = new FormData();
+    form.set("name", "Deletion Token Test");
+    form.set("email", "deletion-token@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Prueba de borrado con token.");
+    form.set("consent", "true");
+    form.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const createResponse = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": clientIp },
+      body: form,
+    });
+    expect(createResponse.status).toBe(201);
+    const createBody = await createResponse.json();
+    expect(typeof createBody.deletionToken).toBe("string");
+    expect(createBody.deletionToken.length).toBeGreaterThan(0);
+    const traceId = createBody.trace.id as string;
+    const deletionToken = createBody.deletionToken as string;
+    const photoPath = join(dataDir, createBody.trace.photo);
+    expect(existsSync(photoPath)).toBe(true);
+
+    const wrongTokenResponse = await fetch(`${baseUrl}/api/traces/${traceId}`, {
+      method: "DELETE",
+      headers: { "X-Deletion-Token": "not-the-real-token" },
+    });
+    expect(wrongTokenResponse.status).toBe(403);
+
+    const noTokenResponse = await fetch(`${baseUrl}/api/traces/${traceId}`, { method: "DELETE" });
+    expect(noTokenResponse.status).toBe(403);
+
+    // Still present after both failed attempts — visible to admin regardless
+    // of public approval status.
+    const stillThereResponse = await fetch(`${baseUrl}/api/admin/traces`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const stillThereBody = await stillThereResponse.json();
+    expect(stillThereBody.traces.some((trace: { id: string }) => trace.id === traceId)).toBe(true);
+
+    const deleteResponse = await fetch(`${baseUrl}/api/traces/${traceId}`, {
+      method: "DELETE",
+      headers: { "X-Deletion-Token": deletionToken },
+    });
+    expect(deleteResponse.status).toBe(200);
+    const deleteBody = await deleteResponse.json();
+    expect(deleteBody.deleted).toBe(true);
+    expect(deleteBody.id).toBe(traceId);
+    expect(existsSync(photoPath)).toBe(false);
+
+    const goneResponse = await fetch(`${baseUrl}/api/admin/traces`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const goneBody = await goneResponse.json();
+    expect(goneBody.traces.some((trace: { id: string }) => trace.id === traceId)).toBe(false);
+
+    // Already deleted: a second attempt with the same valid token now 404s.
+    const repeatResponse = await fetch(`${baseUrl}/api/traces/${traceId}`, {
+      method: "DELETE",
+      headers: { "X-Deletion-Token": deletionToken },
+    });
+    expect(repeatResponse.status).toBe(404);
+  });
+
+  test("DELETE /api/traces/{id} rejects seed data that has no deletion token hash", async () => {
+    // Seed rows are inserted without a deletion_token_hash (pre-dating T010),
+    // so self-service deletion must never succeed for them regardless of
+    // what header is sent.
+    const response = await fetch(`${baseUrl}/api/traces/seed-berlin`, {
+      method: "DELETE",
+      headers: { "X-Deletion-Token": "anything" },
+    });
+    expect(response.status).toBe(403);
+
+    const stillThereResponse = await fetch(`${baseUrl}/api/traces`);
+    const stillThereBody = await stillThereResponse.json();
+    expect(stillThereBody.traces.some((trace: { id: string }) => trace.id === "seed-berlin")).toBe(true);
   });
 });

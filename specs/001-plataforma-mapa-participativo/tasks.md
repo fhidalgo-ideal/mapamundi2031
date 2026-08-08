@@ -137,7 +137,7 @@ referenced by `config.json` respond with real content.
 - [X] T009 [US3] (depends on T008) In `handleCreateTrace` (`server.ts`), replace the hardcoded
   `consent: 1` with the actual `consent` field from the form (accept `"true"/"on"/"1"` as truthy);
   reject creation with a clear message if it isn't truthy.
-- [ ] T010 [US3] (depends on T009) Add self-service deletion: generate a random token per
+- [X] T010 [US3] (depends on T009) Add self-service deletion: generate a random token per
   contribution in `handleCreateTrace`, return it once in the `POST /api/traces` response, store
   only its hash (`deletion_token_hash`, a new column on `traces` via an idempotent migration in
   `initDb()`); add a public `DELETE /api/traces/{id}` (no `requireAdmin`) that deletes the record
