@@ -344,6 +344,49 @@ describe("smoke", () => {
     expect(body.error).toBeTruthy();
   });
 
+  test("POST /api/traces rejects submissions with false or absent consent", async () => {
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+
+    const falseConsentForm = new FormData();
+    falseConsentForm.set("name", "False Consent Test");
+    falseConsentForm.set("email", "false-consent@example.com");
+    falseConsentForm.set("city", "Granada");
+    falseConsentForm.set("country", "Espana");
+    falseConsentForm.set("relation", "Visitante");
+    falseConsentForm.set("emotion", "asombro");
+    falseConsentForm.set("feeling", "Testing false consent rejection.");
+    falseConsentForm.set("consent", "false");
+    falseConsentForm.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const falseConsentResponse = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.70" },
+      body: falseConsentForm,
+    });
+    expect(falseConsentResponse.status).toBe(400);
+    const falseConsentBody = await falseConsentResponse.json();
+    expect(falseConsentBody.error).toBeTruthy();
+
+    const absentConsentForm = new FormData();
+    absentConsentForm.set("name", "Absent Consent Test");
+    absentConsentForm.set("email", "absent-consent@example.com");
+    absentConsentForm.set("city", "Granada");
+    absentConsentForm.set("country", "Espana");
+    absentConsentForm.set("relation", "Visitante");
+    absentConsentForm.set("emotion", "asombro");
+    absentConsentForm.set("feeling", "Testing absent consent rejection.");
+    absentConsentForm.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const absentConsentResponse = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.71" },
+      body: absentConsentForm,
+    });
+    expect(absentConsentResponse.status).toBe(400);
+    const absentConsentBody = await absentConsentResponse.json();
+    expect(absentConsentBody.error).toBeTruthy();
+  });
+
   test("POST /api/traces rejects an image whose declared dimensions exceed the maximum", async () => {
     // T008: T006's dimension guard must reject an oversized canvas using only
     // the container header (IHDR), before any pixel data would be decoded.
@@ -503,5 +546,75 @@ describe("smoke", () => {
     const stillThereResponse = await fetch(`${baseUrl}/api/traces`);
     const stillThereBody = await stillThereResponse.json();
     expect(stillThereBody.traces.some((trace: { id: string }) => trace.id === "seed-berlin")).toBe(true);
+  });
+
+  test("DELETE /api/traces/{id} removes an approved contribution from the public listing", async () => {
+    // Full deletion cycle for an approved (publicly visible) contribution:
+    // create -> approve -> delete with wrong token -> 403 -> delete with the
+    // correct token -> 200 -> no longer present in GET /api/traces.
+    const clientIp = "203.0.113.80"; // Distinct IP to avoid rate-limit collision
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const form = new FormData();
+    form.set("name", "Approved Deletion Test");
+    form.set("email", "approved-deletion@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Prueba de borrado tras aprobacion.");
+    form.set("consent", "true");
+    form.set("photo", new File([photoBytes], "tiny.jpg", { type: "image/jpeg" }));
+
+    const createResponse = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": clientIp },
+      body: form,
+    });
+    expect(createResponse.status).toBe(201);
+    const createBody = await createResponse.json();
+    const traceId = createBody.trace.id as string;
+    const deletionToken = createBody.deletionToken as string;
+
+    const approveResponse = await fetch(`${baseUrl}/api/admin/traces/${traceId}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    expect(approveResponse.status).toBe(200);
+
+    const publicBeforeResponse = await fetch(`${baseUrl}/api/traces`);
+    const publicBeforeBody = await publicBeforeResponse.json();
+    expect(publicBeforeBody.traces.some((trace: { id: string }) => trace.id === traceId)).toBe(true);
+
+    const wrongTokenResponse = await fetch(`${baseUrl}/api/traces/${traceId}`, {
+      method: "DELETE",
+      headers: { "X-Deletion-Token": "not-the-real-token" },
+    });
+    expect(wrongTokenResponse.status).toBe(403);
+
+    const deleteResponse = await fetch(`${baseUrl}/api/traces/${traceId}`, {
+      method: "DELETE",
+      headers: { "X-Deletion-Token": deletionToken },
+    });
+    expect(deleteResponse.status).toBe(200);
+
+    const publicAfterResponse = await fetch(`${baseUrl}/api/traces`);
+    const publicAfterBody = await publicAfterResponse.json();
+    expect(publicAfterBody.traces.some((trace: { id: string }) => trace.id === traceId)).toBe(false);
+  });
+
+  test("GET /politica-de-privacidad and GET /aviso-legal serve the legal pages", async () => {
+    const privacyResponse = await fetch(`${baseUrl}/politica-de-privacidad`);
+    expect(privacyResponse.status).toBe(200);
+    const privacyBody = await privacyResponse.text();
+    expect(privacyBody.length).toBeGreaterThan(0);
+
+    const legalResponse = await fetch(`${baseUrl}/aviso-legal`);
+    expect(legalResponse.status).toBe(200);
+    const legalBody = await legalResponse.text();
+    expect(legalBody.length).toBeGreaterThan(0);
   });
 });
