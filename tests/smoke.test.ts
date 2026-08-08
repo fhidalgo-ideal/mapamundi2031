@@ -4,7 +4,7 @@
 // path end to end. Extend this file (don't add new test files) as new
 // endpoints/behaviors land — see specs/001-plataforma-mapa-participativo/.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Subprocess } from "bun";
@@ -26,6 +26,29 @@ const TINY_JPEG_BASE64 =
   "U1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3" +
   "uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwCaiiiv" +
   "GPaP/9k=";
+
+const NON_IMAGE_DECOY_BASE64 =
+  "VGhpcyBpcyBub3QgYW4gaW1hZ2UuIFBsYWluIHRleHQgZGVjb3kgcGF5bG9hZCBmb3Igc2lnbmF0dX" +
+  "JlLXNuaWZmaW5nIHNtb2tlIHRlc3Qu";
+
+const OVERSIZED_PNG_HEADER_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAH0AAAB9A";
+
+const GPS_EXIF_JPEG_BASE64 =
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/4QCsRXhpZgAATU0AKgAAAAgAAYglAAQAAAABAAAAGgAAAAAABQ" +
+  "ABAAIAAAACTgAAAAACAAUAAAADAAAAXAADAAIAAAACVwAAAAAEAAUAAAADAAAAdAAcAAcAAAAXAAAA" +
+  "jAAAAAAAAAAlAAAAAQAAAAoAAAABAAACaQAAADIAAAADAAAAAQAAACQAAAABAAAA5AAAAAVHUkFOQU" +
+  "RBLUdQUy1DQU5BUlktOUYzRAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsN" +
+  "DhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFB" +
+  "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAAEAAQDASIAAhEBAxEB" +
+  "/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAA" +
+  "QRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdI" +
+  "SUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7" +
+  "i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAA" +
+  "AAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFE" +
+  "KRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hp" +
+  "anN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1d" +
+  "bX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDyeiiivzw/sg//2Q==";
 
 const STARTUP_TIMEOUT_MS = 10_000;
 
@@ -291,5 +314,108 @@ describe("smoke", () => {
       (trace: { email: string }) => trace.email === honeypotEmail,
     );
     expect(honeypotRecords.length).toBe(0);
+  });
+
+  test("POST /api/traces rejects a non-image file disguised with an image extension/Content-Type", async () => {
+    // T008: T005's signature sniffing must reject payloads whose actual bytes
+    // don't match any supported image signature, regardless of what the
+    // client claims via filename/Content-Type.
+    const clientIp = "203.0.113.30"; // Distinct IP to avoid rate-limit collision
+    const decoyBytes = Uint8Array.from(atob(NON_IMAGE_DECOY_BASE64), (char) => char.charCodeAt(0));
+
+    const form = new FormData();
+    form.set("name", "Decoy Upload Test");
+    form.set("email", "decoy@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Testing non-image signature rejection.");
+    form.set("consent", "true");
+    form.set("photo", new File([decoyBytes], "photo.jpg", { type: "image/jpeg" }));
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": clientIp },
+      body: form,
+    });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBeTruthy();
+  });
+
+  test("POST /api/traces rejects an image whose declared dimensions exceed the maximum", async () => {
+    // T008: T006's dimension guard must reject an oversized canvas using only
+    // the container header (IHDR), before any pixel data would be decoded.
+    const clientIp = "203.0.113.40"; // Distinct IP to avoid rate-limit collision
+    const oversizedBytes = Uint8Array.from(
+      atob(OVERSIZED_PNG_HEADER_BASE64),
+      (char) => char.charCodeAt(0),
+    );
+
+    const form = new FormData();
+    form.set("name", "Oversized Image Test");
+    form.set("email", "oversized@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Testing dimension guard rejection.");
+    form.set("consent", "true");
+    form.set("photo", new File([oversizedBytes], "huge.png", { type: "image/png" }));
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": clientIp },
+      body: form,
+    });
+    expect(response.status).toBe(413);
+    const body = await response.json();
+    expect(body.error).toBeTruthy();
+  });
+
+  test("POST /api/traces accepts a GPS-tagged JPEG but strips its EXIF before persisting", async () => {
+    // T008: T007's stripExif() must remove the whole APP1/Exif segment (which
+    // carries the GPS IFD) from the bytes actually written to uploads/, even
+    // though the upload itself is accepted.
+    const clientIp = "203.0.113.50"; // Distinct IP to avoid rate-limit collision
+    const gpsPhotoBytes = Uint8Array.from(atob(GPS_EXIF_JPEG_BASE64), (char) => char.charCodeAt(0));
+
+    // Sanity-check the fixture itself: it must actually carry the EXIF/GPS
+    // canary before upload, otherwise the assertion below would be vacuous.
+    const originalAscii = Buffer.from(gpsPhotoBytes).toString("latin1");
+    expect(originalAscii).toContain("Exif");
+    expect(originalAscii).toContain("GRANADA-GPS-CANARY-9F3D");
+
+    const form = new FormData();
+    form.set("name", "GPS EXIF Test");
+    form.set("email", "gps-exif@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Testing EXIF stripping.");
+    form.set("consent", "true");
+    form.set("photo", new File([gpsPhotoBytes], "gps.jpg", { type: "image/jpeg" }));
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": clientIp },
+      body: form,
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.trace.status).toBe("pending");
+    expect(typeof body.trace.photo).toBe("string");
+
+    const persistedBytes = readFileSync(join(dataDir, body.trace.photo));
+    // Still a valid JPEG (SOI marker) — the sanitizer works on the container
+    // bytes without re-encoding pixels.
+    expect(persistedBytes[0]).toBe(0xff);
+    expect(persistedBytes[1]).toBe(0xd8);
+
+    const persistedAscii = Buffer.from(persistedBytes).toString("latin1");
+    expect(persistedAscii).not.toContain("Exif");
+    expect(persistedAscii).not.toContain("GRANADA-GPS-CANARY-9F3D");
   });
 });

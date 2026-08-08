@@ -118,7 +118,7 @@ having its EXIF metadata stripped.
 - [X] T007 [US2] (depends on T006) Add `stripExif(data: Uint8Array, kind: string): Uint8Array` in
   `server.ts`: removes the JPEG `APP1`/EXIF segment, the PNG `eXIf` chunk, and the WEBP `EXIF`
   chunk before writing the file to `uploads/`; safe no-op if the format carries no EXIF.
-- [ ] T008 [US2] (depends on T007) Extend `tests/smoke.test.ts` with binary fixtures: a
+- [X] T008 [US2] (depends on T007) Extend `tests/smoke.test.ts` with binary fixtures: a
   non-image file with an image extension/`Content-Type` → rejected; an image with dimensions
   above the maximum → rejected; a fixture JPEG with known GPS EXIF → accepted, but the final file
   in `uploads/` no longer contains that EXIF.
