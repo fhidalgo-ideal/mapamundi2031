@@ -18,6 +18,10 @@ const TRACE_RATE_LIMIT_MAX = Number(process.env.GRANADA_TRACE_RATE_LIMIT_MAX ?? 
 const TRACE_RATE_LIMIT_WINDOW_MS = Number(
   process.env.GRANADA_TRACE_RATE_LIMIT_WINDOW_MS ?? 60 * 60 * 1000,
 );
+const ADMIN_LOGIN_LOCKOUT_MAX = Number(process.env.GRANADA_ADMIN_LOGIN_LOCKOUT_MAX ?? 5);
+const ADMIN_LOGIN_LOCKOUT_WINDOW_MS = Number(
+  process.env.GRANADA_ADMIN_LOGIN_LOCKOUT_WINDOW_MS ?? 15 * 60 * 1000,
+);
 const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -806,6 +810,16 @@ function handleGetAuditLog(request: Request): Response {
 }
 
 async function handleAdminLogin(request: Request, server?: IpResolvingServer): Promise<Response> {
+  const clientIp = getClientIp(request, server);
+  const lockout = adminLoginLockout.check(clientIp);
+  if (lockout.limited) {
+    const response = errorResponse(
+      "Demasiados intentos fallidos de inicio de sesion. Intentalo mas tarde.",
+      429,
+    );
+    response.headers.set("Retry-After", String(lockout.retryAfterSeconds));
+    return response;
+  }
   let payload: { password?: unknown };
   try {
     payload = await request.json();
@@ -819,8 +833,8 @@ async function handleAdminLogin(request: Request, server?: IpResolvingServer): P
   const expectedBuf = Buffer.from(expected, "utf-8");
   const matches =
     passwordBuf.length === expectedBuf.length && timingSafeEqual(passwordBuf, expectedBuf);
-  const clientIp = getClientIp(request, server);
   if (!matches) {
+    adminLoginLockout.recordFailure(clientIp);
     recordAuditLog("login_failure", null, clientIp);
     return errorResponse("Password de administracion incorrecta.", 401);
   }
@@ -873,6 +887,36 @@ function createRateLimiter(maxHits: number, windowMs: number) {
 }
 
 const checkTraceRateLimit = createRateLimiter(TRACE_RATE_LIMIT_MAX, TRACE_RATE_LIMIT_WINDOW_MS);
+
+function createFailureLockout(maxFailures: number, windowMs: number) {
+  const failuresByKey = new Map<string, number[]>();
+  const recentFailures = (key: string): number[] => {
+    const windowStart = Date.now() - windowMs;
+    const pruned = (failuresByKey.get(key) ?? []).filter((timestamp) => timestamp > windowStart);
+    failuresByKey.set(key, pruned);
+    return pruned;
+  };
+  return {
+    // Peeks lockout status without recording a hit, so a correct password
+    // submitted while locked out is still rejected instead of resetting
+    // or bypassing the lockout.
+    check(key: string): RateLimitResult {
+      const failures = recentFailures(key);
+      if (failures.length >= maxFailures) {
+        const retryAfterMs = failures[0] + windowMs - Date.now();
+        return { limited: true, retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)) };
+      }
+      return { limited: false, retryAfterSeconds: 0 };
+    },
+    recordFailure(key: string): void {
+      const failures = recentFailures(key);
+      failures.push(Date.now());
+      failuresByKey.set(key, failures);
+    },
+  };
+}
+
+const adminLoginLockout = createFailureLockout(ADMIN_LOGIN_LOCKOUT_MAX, ADMIN_LOGIN_LOCKOUT_WINDOW_MS);
 
 const GENERIC_SUBMISSION_ERROR = "No se ha podido procesar tu contribucion. Intentalo de nuevo mas tarde.";
 

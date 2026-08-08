@@ -194,7 +194,7 @@ attempts per IP.
   `handleUpdateTrace`, and `handleDeleteTrace`, and from `handleAdminLogin` (both success and
   failure); add `GET /api/admin/audit-log` (protected with `requireAdmin`), paginated by
   `created_at` descending.
-- [ ] T017 [US5] (depends on T016) Apply per-IP lockout to `POST /api/admin/login`, reusing the
+- [X] T017 [US5] (depends on T016) Apply per-IP lockout to `POST /api/admin/login`, reusing the
   rate-limiter structure from T003 (failure counter per IP, e.g. max 5 failed attempts in 15
   minutes → `429` until it expires, even with the correct password).
 - [ ] T018 [US5] (depends on T017) Extend `tests/smoke.test.ts`: an admin action (e.g. approving
