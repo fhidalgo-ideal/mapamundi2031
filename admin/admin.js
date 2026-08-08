@@ -271,12 +271,6 @@ function renderReviewList() {
 }
 
 function fillEditForm(form, trace) {
-  form.elements.name.value = trace.name;
-  form.elements.email.value = trace.email;
-  form.elements.city.value = trace.city;
-  form.elements.country.value = trace.country;
-  form.elements.relation.value = trace.relation;
-  form.elements.emotion.value = trace.emotion;
   form.elements.feeling.value = trace.feeling;
 }
 

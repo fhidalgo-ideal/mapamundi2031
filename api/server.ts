@@ -1334,12 +1334,6 @@ async function handleUpdateTrace(request: Request, traceId: string, server?: IpR
   }
 
   const allowed: Record<string, number> = {
-    name: 120,
-    email: 180,
-    city: 120,
-    country: 120,
-    relation: 160,
-    emotion: 40,
     feeling: 600,
   };
   const updates: Record<string, string | number> = {};
@@ -1351,24 +1345,6 @@ async function handleUpdateTrace(request: Request, traceId: string, server?: IpR
       }
       updates[field] = value;
     }
-  }
-
-  if ("emotion" in updates && !VALID_EMOTIONS.has(updates.emotion as string)) {
-    return errorResponse("La emocion indicada no es valida.");
-  }
-
-  if ("city" in updates || "country" in updates) {
-    const current = db.query("SELECT city, country FROM traces WHERE id = ?").get(traceId) as
-      | { city: string; country: string }
-      | undefined;
-    if (!current) {
-      return errorResponse("No existe esa contribucion.", 404);
-    }
-    const city = (updates.city as string) ?? current.city;
-    const country = (updates.country as string) ?? current.country;
-    const [lat, lng] = await resolveCoordinatesAsync(city, country);
-    updates.lat = lat;
-    updates.lng = lng;
   }
 
   if (Object.keys(updates).length === 0) {
