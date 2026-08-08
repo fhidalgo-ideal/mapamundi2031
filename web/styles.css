@@ -661,7 +661,7 @@ h2 {
   border-radius: 8px;
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
   display: grid;
-  grid-template-rows: 220px 1fr;
+  grid-template-rows: 220px auto 1fr;
   max-height: calc(100vh - 44px);
   max-width: 420px;
   overflow-y: auto;
@@ -687,6 +687,34 @@ h2 {
   height: 220px;
   object-fit: cover;
   width: 100%;
+}
+
+.story-thumbs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 16px 0;
+}
+
+.story-thumb {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.story-thumb img {
+  border-radius: 4px;
+  display: block;
+  height: 44px;
+  object-fit: cover;
+  width: 44px;
+}
+
+.story-thumb.is-active {
+  border-color: var(--coral);
 }
 
 .icon-button {
@@ -1091,11 +1119,31 @@ textarea {
   padding: 12px;
 }
 
-.review-item img {
+.review-photos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 120px;
+}
+
+.review-photos > img {
   aspect-ratio: 1;
   border-radius: 6px;
   object-fit: cover;
-  width: 120px;
+  width: 100%;
+}
+
+.review-photos-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.review-photos-extra img {
+  border-radius: 4px;
+  height: 26px;
+  object-fit: cover;
+  width: 26px;
 }
 
 .review-item h3 {
@@ -1240,7 +1288,7 @@ textarea {
 
   .story-panel {
     bottom: 12px;
-    grid-template-rows: 150px 1fr;
+    grid-template-rows: 150px auto 1fr;
     left: 12px;
     max-height: min(78vh, 560px);
     max-width: none;
@@ -1268,7 +1316,7 @@ textarea {
     grid-template-columns: 92px 1fr;
   }
 
-  .review-item img {
+  .review-photos {
     width: 92px;
   }
 

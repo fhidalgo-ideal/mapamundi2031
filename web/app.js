@@ -13,12 +13,14 @@ let traces = [];
 let archiveVisibleCount = ARCHIVE_BATCH_SIZE;
 let activeFilter = "all";
 let selectedTraceId = null;
+let storyPhotos = [];
 
 const worldMapEl = document.querySelector("#worldMap");
 const form = document.querySelector("#traceForm");
 const archiveGrid = document.querySelector("#archiveGrid");
 const archiveLoadMoreButton = document.querySelector("#archiveLoadMore");
 const storyPanel = document.querySelector("#storyPanel");
+const storyThumbs = document.querySelector("#storyThumbs");
 const zoomInButton = document.querySelector("#zoomIn");
 const zoomOutButton = document.querySelector("#zoomOut");
 const zoomResetButton = document.querySelector("#zoomReset");
@@ -198,9 +200,41 @@ function visibleTraces() {
   return approvedTraces().filter((trace) => activeFilter === "all" || trace.emotion === activeFilter);
 }
 
+function renderStoryThumbs() {
+  storyThumbs.innerHTML = "";
+  if (storyPhotos.length <= 1) {
+    storyThumbs.classList.add("hidden");
+    return;
+  }
+  storyThumbs.classList.remove("hidden");
+  storyPhotos.forEach((photoUrl, index) => {
+    const thumbButton = document.createElement("button");
+    thumbButton.type = "button";
+    thumbButton.className = "story-thumb";
+    thumbButton.setAttribute("aria-label", `Foto ${index + 1} de ${storyPhotos.length}`);
+    const thumbImage = document.createElement("img");
+    thumbImage.src = photoUrl;
+    thumbImage.alt = "";
+    thumbButton.appendChild(thumbImage);
+    thumbButton.addEventListener("click", () => setStoryPhoto(index));
+    storyThumbs.appendChild(thumbButton);
+  });
+}
+
+function setStoryPhoto(index) {
+  const photoUrl = storyPhotos[index];
+  if (!photoUrl) return;
+  document.querySelector("#storyImage").src = photoUrl;
+  storyThumbs.querySelectorAll(".story-thumb").forEach((thumbButton, thumbIndex) => {
+    thumbButton.classList.toggle("is-active", thumbIndex === index);
+  });
+}
+
 function openStory(trace) {
   selectedTraceId = trace.id;
-  document.querySelector("#storyImage").src = trace.photo;
+  storyPhotos = trace.photos && trace.photos.length ? trace.photos : [trace.photo];
+  renderStoryThumbs();
+  setStoryPhoto(0);
   document.querySelector("#storyImage").alt = `Fotografia subida por ${trace.name}`;
   document.querySelector("#storyEmotion").textContent = emotionLabels[trace.emotion];
   document.querySelector("#storyEmotion").className = `emotion ${trace.emotion}`;
