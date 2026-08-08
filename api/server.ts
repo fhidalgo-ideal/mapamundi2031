@@ -19,6 +19,9 @@ const SECRETS_PATH = process.env.GRANADA_SECRETS_PATH ?? join(ROOT_DIR, ".dev");
 const APP_VERSION = "2026-05-07-config-footer";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = Number(process.env.GRANADA_MAX_IMAGE_DIMENSION ?? 6000);
+// Max photos per contribution — mirrors PHOTO01's frontend picker cap. The
+// first is the cover (traces.photo); extras (2nd onward) go in trace_photos.
+const MAX_PHOTOS = 5;
 const ADMIN_TOKEN_TTL_SECONDS = 12 * 60 * 60;
 const TRACE_RATE_LIMIT_MAX = Number(process.env.GRANADA_TRACE_RATE_LIMIT_MAX ?? 5);
 const TRACE_RATE_LIMIT_WINDOW_MS = Number(
@@ -376,6 +379,15 @@ function initDb() {
       created_at TEXT NOT NULL
     )
   `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS trace_photos (
+      id TEXT PRIMARY KEY,
+      trace_id TEXT NOT NULL,
+      path TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
   const { count } = db.query("SELECT COUNT(*) as count FROM traces").get() as { count: number };
   if (count === 0) {
     const insert = db.prepare(`
@@ -427,6 +439,11 @@ interface TraceRow {
 }
 
 function rowToTrace(row: TraceRow) {
+  // Extra photos (2nd onward) live in trace_photos; the cover is traces.photo.
+  // photos[] exposes the full ordered set: cover first, then extras by position.
+  const extras = db
+    .query("SELECT path FROM trace_photos WHERE trace_id = ? ORDER BY position ASC")
+    .all(row.id) as { path: string }[];
   return {
     id: row.id,
     name: row.name,
@@ -439,6 +456,7 @@ function rowToTrace(row: TraceRow) {
     emotion: row.emotion,
     feeling: row.feeling,
     photo: row.photo,
+    photos: [row.photo, ...extras.map((e) => e.path)],
     status: row.status,
     createdAt: row.created_at,
   };
@@ -1035,6 +1053,52 @@ const adminLoginLockout = createFailureLockout(ADMIN_LOGIN_LOCKOUT_MAX, ADMIN_LO
 
 const GENERIC_SUBMISSION_ERROR = "No se ha podido procesar tu contribucion. Intentalo de nuevo mas tarde.";
 
+// Runs one uploaded file through the full validation/sanitization pipeline used
+// for contribution photos: size cap, Content-Type allowlist, binary signature
+// sniff, decompression-bomb dimension guard, and EXIF stripping. Returns the
+// sanitized bytes + resolved extension, or an already-built error Response.
+// Shared by every file in a multi-photo submission so they all get the exact
+// same checks the single photo received before PHOTO02.
+async function validateAndSanitizePhoto(
+  photo: File,
+): Promise<{ sanitized: Uint8Array; extension: string } | { error: Response }> {
+  if (photo.size > MAX_UPLOAD_BYTES) {
+    return { error: errorResponse("La fotografia supera el limite de 8 MB.", 413) };
+  }
+  if (!ALLOWED_IMAGE_TYPES[photo.type]) {
+    return { error: errorResponse("Formato no permitido. Usa JPG, PNG o WEBP.") };
+  }
+
+  // Validate binary signature independently of Content-Type/extension
+  const headerBytes = new Uint8Array(await photo.arrayBuffer());
+  const sniffedType = sniffImageSignature(headerBytes);
+  if (!sniffedType) {
+    return { error: errorResponse("La fotografia no tiene un formato valido (JPG, PNG o WEBP).") };
+  }
+
+  // Anti decompression-bomb: read intrinsic dimensions from the header only
+  // (no full pixel decode) and reject oversized canvases before persisting.
+  const [imgWidth, imgHeight] = readImageDimensions(headerBytes, sniffedType);
+  if (imgWidth <= 0 || imgHeight <= 0) {
+    return { error: errorResponse("No se pudieron leer las dimensiones de la fotografia.") };
+  }
+  if (imgWidth > MAX_IMAGE_DIMENSION || imgHeight > MAX_IMAGE_DIMENSION) {
+    return {
+      error: errorResponse(
+        `La fotografia excede el tamano maximo de ${MAX_IMAGE_DIMENSION}x${MAX_IMAGE_DIMENSION} px.`,
+        413,
+      ),
+    };
+  }
+
+  // Use sniffed type for extension to ensure content/extension alignment. Strip
+  // EXIF (GPS/device metadata) before the bytes ever touch disk.
+  return {
+    sanitized: stripExif(headerBytes, sniffedType),
+    extension: ALLOWED_IMAGE_TYPES[sniffedType]!,
+  };
+}
+
 async function handleCreateTrace(request: Request, server?: IpResolvingServer): Promise<Response> {
   const clientIp = getClientIp(request, server);
   const rateLimit = checkTraceRateLimit(clientIp);
@@ -1048,8 +1112,11 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   }
 
   const contentLength = Number(request.headers.get("Content-Length") ?? "0");
-  if (contentLength > MAX_UPLOAD_BYTES) {
-    return errorResponse("La fotografia supera el limite de 8 MB.", 413);
+  // Coarse pre-filter on the aggregate body before parsing. A contribution may
+  // carry up to MAX_PHOTOS files; each individual file is still capped at
+  // MAX_UPLOAD_BYTES by the per-file validation below.
+  if (contentLength > MAX_PHOTOS * MAX_UPLOAD_BYTES) {
+    return errorResponse("La contribucion supera el limite de tamano permitido.", 413);
   }
   const contentType = request.headers.get("Content-Type") ?? "";
   if (!contentType.includes("multipart/form-data")) {
@@ -1087,49 +1154,47 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
     return errorResponse("Debes aceptar el consentimiento para continuar.");
   }
 
-  const photo = form.get("photo");
-  if (!(photo instanceof File) || !photo.name) {
+  const photoFiles = form
+    .getAll("photo")
+    .filter((entry): entry is File => entry instanceof File && entry.name.length > 0);
+  if (photoFiles.length === 0) {
     return errorResponse("Falta la fotografia.");
   }
-  if (photo.size > MAX_UPLOAD_BYTES) {
-    return errorResponse("La fotografia supera el limite de 8 MB.", 413);
+  if (photoFiles.length > MAX_PHOTOS) {
+    return errorResponse(`Puedes adjuntar como maximo ${MAX_PHOTOS} fotografias.`);
   }
 
-  const mediaType = photo.type;
-  if (!ALLOWED_IMAGE_TYPES[mediaType]) {
-    return errorResponse("Formato no permitido. Usa JPG, PNG o WEBP.");
+  // Validate/sanitize EVERY file up front through the same pipeline as a single
+  // photo. Reject the whole submission on the first failure so we never persist
+  // a partial set (some files saved, others rejected).
+  const processed: { sanitized: Uint8Array; extension: string }[] = [];
+  for (const file of photoFiles) {
+    const result = await validateAndSanitizePhoto(file);
+    if ("error" in result) {
+      return result.error;
+    }
+    processed.push(result);
   }
-
-  // Validate binary signature independently of Content-Type/extension
-  const headerBytes = new Uint8Array(await photo.arrayBuffer());
-  const sniffedType = sniffImageSignature(headerBytes);
-  if (!sniffedType) {
-    return errorResponse("La fotografia no tiene un formato valido (JPG, PNG o WEBP).");
-  }
-
-  // Anti decompression-bomb: read intrinsic dimensions from the header only
-  // (no full pixel decode) and reject oversized canvases before persisting.
-  const [imgWidth, imgHeight] = readImageDimensions(headerBytes, sniffedType);
-  if (imgWidth <= 0 || imgHeight <= 0) {
-    return errorResponse("No se pudieron leer las dimensiones de la fotografia.");
-  }
-  if (imgWidth > MAX_IMAGE_DIMENSION || imgHeight > MAX_IMAGE_DIMENSION) {
-    return errorResponse(
-      `La fotografia excede el tamano maximo de ${MAX_IMAGE_DIMENSION}x${MAX_IMAGE_DIMENSION} px.`,
-      413,
-    );
-  }
-
-  // Use sniffed type for extension to ensure content/extension alignment
-  const extension = ALLOWED_IMAGE_TYPES[sniffedType]!;
 
   const traceId = randomUUID();
-  const fileName = `${traceId}${extension}`;
-  const destination = join(UPLOAD_DIR, fileName);
-  // Persist the sanitized bytes: strip EXIF (GPS/device metadata) before it
-  // ever touches disk, so uploads/ never leaks contributor location data.
-  const sanitized = stripExif(headerBytes, sniffedType);
-  await Bun.write(destination, sanitized);
+  // First valid file is the cover (traces.photo + on-disk file), unchanged from
+  // the single-photo behavior. Extras (2nd onward) go to uploads/ + trace_photos.
+  const coverFileName = `${traceId}${processed[0].extension}`;
+  await Bun.write(join(UPLOAD_DIR, coverFileName), processed[0].sanitized);
+  const fileName = coverFileName;
+
+  const extraPhotoRows: { id: string; path: string; position: number; created_at: string }[] = [];
+  for (let i = 1; i < processed.length; i++) {
+    const extraId = randomUUID();
+    const extraFileName = `${extraId}${processed[i].extension}`;
+    await Bun.write(join(UPLOAD_DIR, extraFileName), processed[i].sanitized);
+    extraPhotoRows.push({
+      id: extraId,
+      path: `/uploads/${extraFileName}`,
+      position: i,
+      created_at: nowIso(),
+    });
+  }
 
   const [lat, lng] = await resolveCoordinatesAsync(values.city, values.country);
   // Deletion token: returned once in this response and never persisted in
@@ -1178,6 +1243,22 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
     $created_at: trace.created_at,
     $deletion_token_hash: trace.deletion_token_hash,
   });
+
+  if (extraPhotoRows.length > 0) {
+    const insertPhoto = db.prepare(
+      `INSERT INTO trace_photos (id, trace_id, path, position, created_at)
+       VALUES ($id, $trace_id, $path, $position, $created_at)`,
+    );
+    for (const extra of extraPhotoRows) {
+      insertPhoto.run({
+        $id: extra.id,
+        $trace_id: traceId,
+        $path: extra.path,
+        $position: extra.position,
+        $created_at: extra.created_at,
+      });
+    }
+  }
 
   return jsonResponse({ trace: rowToTrace(trace as unknown as TraceRow), deletionToken }, 201);
 }
@@ -1311,20 +1392,29 @@ function hashDeletionToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function deleteTraceRow(row: TraceRow): void {
-  db.prepare("DELETE FROM traces WHERE id = ?").run(row.id);
+function unlinkUploadFile(photoPath: string): void {
+  if (!photoPath.startsWith("/uploads/")) return;
+  const uploadPath = resolve(UPLOAD_DIR, photoPath.slice("/uploads/".length));
+  const uploadRoot = resolve(UPLOAD_DIR) + sep;
+  if (!uploadPath.startsWith(uploadRoot)) return;
+  try {
+    unlinkSync(uploadPath);
+  } catch {
+    // file already gone; not an error for the logical delete
+  }
+}
 
-  if (row.photo.startsWith("/uploads/")) {
-    const fileName = row.photo.slice("/uploads/".length);
-    const uploadPath = resolve(UPLOAD_DIR, fileName);
-    const uploadRoot = resolve(UPLOAD_DIR) + sep;
-    if (uploadPath.startsWith(uploadRoot)) {
-      try {
-        unlinkSync(uploadPath);
-      } catch {
-        // file already gone; not an error for the logical delete
-      }
-    }
+function deleteTraceRow(row: TraceRow): void {
+  // Remove every file this trace owns: the cover (traces.photo) plus each extra
+  // in trace_photos, then the DB rows themselves — no orphaned files or rows.
+  const extras = db
+    .query("SELECT path FROM trace_photos WHERE trace_id = ?")
+    .all(row.id) as { path: string }[];
+  db.prepare("DELETE FROM trace_photos WHERE trace_id = ?").run(row.id);
+  db.prepare("DELETE FROM traces WHERE id = ?").run(row.id);
+  unlinkUploadFile(row.photo);
+  for (const extra of extras) {
+    unlinkUploadFile(extra.path);
   }
 }
 

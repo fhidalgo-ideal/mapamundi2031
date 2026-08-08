@@ -849,4 +849,112 @@ describe("smoke", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBeTruthy();
   });
+  test("PHOTO02: POST /api/traces stores multiple photos and exposes them via photos[]", async () => {
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const form = new FormData();
+    form.set("name", "Multi Photo Test");
+    form.set("email", "multi-photo@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Tres fotografias en una sola contribucion.");
+    form.set("consent", "true");
+    // Three files under the same "photo" field — cover + 2 extras.
+    for (let i = 1; i <= 3; i++) {
+      form.append("photo", new File([photoBytes], `photo-${i}.jpg`, { type: "image/jpeg" }));
+    }
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.130" },
+      body: form,
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(Array.isArray(body.trace.photos)).toBe(true);
+    expect(body.trace.photos.length).toBe(3);
+    // Cover stays backward-compatible and is the first element of photos[].
+    expect(body.trace.photo).toBe(body.trace.photos[0]);
+    const multiTraceId = body.trace.id as string;
+
+    const approveResponse = await fetch(`${baseUrl}/api/admin/traces/${multiTraceId}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    expect(approveResponse.status).toBe(200);
+
+    const publicResponse = await fetch(`${baseUrl}/api/traces`);
+    const publicBody = await publicResponse.json();
+    const approved = publicBody.traces.find((trace: { id: string }) => trace.id === multiTraceId);
+    expect(approved?.photos.length).toBe(3);
+  });
+
+  test("PHOTO02: POST /api/traces rejects a submission with more than 5 photos", async () => {
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const form = new FormData();
+    form.set("name", "Too Many Photos Test");
+    form.set("email", "too-many-photos@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Seis fotografias, una de mas.");
+    form.set("consent", "true");
+    for (let i = 1; i <= 6; i++) {
+      form.append("photo", new File([photoBytes], `photo-${i}.jpg`, { type: "image/jpeg" }));
+    }
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.140" },
+      body: form,
+    });
+    expect(response.status).toBe(400);
+  });
+
+  test("PHOTO02: deleting a multi-photo trace removes every file from uploads/", async () => {
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const form = new FormData();
+    form.set("name", "Multi Photo Delete Test");
+    form.set("email", "multi-photo-delete@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Borrado de una contribucion con varias fotos.");
+    form.set("consent", "true");
+    for (let i = 1; i <= 3; i++) {
+      form.append("photo", new File([photoBytes], `photo-${i}.jpg`, { type: "image/jpeg" }));
+    }
+
+    const createResponse = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.150" },
+      body: form,
+    });
+    expect(createResponse.status).toBe(201);
+    const createBody = await createResponse.json();
+    const traceId = createBody.trace.id as string;
+    const deletionToken = createBody.deletionToken as string;
+    const photoPaths = (createBody.trace.photos as string[]).map((p) => join(dataDir, p));
+    expect(photoPaths.length).toBe(3);
+    for (const photoPath of photoPaths) {
+      expect(existsSync(photoPath)).toBe(true);
+    }
+
+    const deleteResponse = await fetch(`${baseUrl}/api/traces/${traceId}`, {
+      method: "DELETE",
+      headers: { "X-Deletion-Token": deletionToken },
+    });
+    expect(deleteResponse.status).toBe(200);
+    for (const photoPath of photoPaths) {
+      expect(existsSync(photoPath)).toBe(false);
+    }
+  });
+
 });
