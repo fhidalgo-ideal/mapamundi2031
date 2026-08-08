@@ -71,7 +71,10 @@ a {
   position: fixed;
   right: 0;
   top: 0;
-  z-index: 20;
+  /* Above the map's own stacked UI (.map-controls/.map-hint at 1000) so it
+     can't peek over the fixed header's edge during scroll; below the
+     modal/story-panel overlays (2000), which must sit above everything. */
+  z-index: 1500;
 }
 
 .brand {
@@ -666,7 +669,10 @@ h2 {
   right: 22px;
   top: 92px;
   width: min(420px, calc(100vw - 44px));
-  z-index: 40;
+  /* Same fix as .modal-overlay: must beat the map's own stacked UI
+     (.map-controls/.map-hint at 1000, Leaflet's panes up to 700) or the
+     live map bleeds through this fixed panel wherever they overlap. */
+  z-index: 2000;
 }
 
 .story-panel.hidden {
