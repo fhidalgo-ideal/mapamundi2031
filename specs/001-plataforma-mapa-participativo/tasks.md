@@ -134,7 +134,7 @@ referenced by `config.json` respond with real content.
 
 **Independent Test**: See spec.md US3.
 
-- [ ] T009 [US3] (depends on T008) In `handleCreateTrace` (`server.ts`), replace the hardcoded
+- [X] T009 [US3] (depends on T008) In `handleCreateTrace` (`server.ts`), replace the hardcoded
   `consent: 1` with the actual `consent` field from the form (accept `"true"/"on"/"1"` as truthy);
   reject creation with a clear message if it isn't truthy.
 - [ ] T010 [US3] (depends on T009) Add self-service deletion: generate a random token per

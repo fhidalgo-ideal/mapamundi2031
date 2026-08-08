@@ -895,7 +895,7 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
     feeling: values.feeling.slice(0, 600),
     photo: `/uploads/${fileName}`,
     status: "pending",
-    consent: 1,
+    consent: consentTruthy ? 1 : 0,
     created_at: nowIso(),
   };
 
