@@ -597,7 +597,7 @@ h2 {
   position: absolute;
   right: 16px;
   top: 16px;
-  z-index: 4;
+  z-index: 1000;
 }
 
 .map-controls .map-control {
@@ -623,6 +623,7 @@ h2 {
   left: 16px;
   padding: 9px 13px;
   position: absolute;
+  z-index: 1000;
 }
 
 .story-panel {

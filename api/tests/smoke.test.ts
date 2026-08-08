@@ -652,7 +652,7 @@ describe("smoke", () => {
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
       "Referrer-Policy": "strict-origin-when-cross-origin",
-      "Content-Security-Policy": "default-src 'self'; img-src 'self' data:",
+      "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org",
     };
 
     const endpoints = ["/", "/api/health", "/api/traces"];

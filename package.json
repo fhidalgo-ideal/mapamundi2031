@@ -2,12 +2,15 @@
   "name": "granada2031",
   "version": "1.0.0",
   "private": true,
-  "description": "Granada 2031 - Geolocalizacion del Sentimiento. Servidor Bun con SQLite integrado, sin dependencias externas.",
+  "description": "Granada 2031 - Geolocalizacion del Sentimiento. Servidor Bun con SQLite integrado, sin dependencias de runtime en el servidor. El frontend usa Leaflet (vendorizado en web/vendor/leaflet/) para el mapa de OpenStreetMap.",
   "scripts": {
     "start": "bun run api/server.ts",
     "test": "bun test"
   },
   "engines": {
     "bun": ">=1.3.0"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4"
   }
 }

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Granada 2031 | Geolocalizacion del Sentimiento</title>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
     <link rel="stylesheet" href="styles.css?v=20260507-config-footer">
   </head>
   <body>
@@ -118,7 +119,7 @@
               <button class="icon-button map-control" id="zoomOut" type="button" aria-label="Alejar">-</button>
               <button class="icon-button map-control reset" id="zoomReset" type="button" aria-label="Restablecer zoom">1:1</button>
             </div>
-            <canvas id="worldMap" width="1400" height="760" aria-label="Mapamundi interactivo"></canvas>
+            <div id="worldMap" role="application" aria-label="Mapamundi interactivo"></div>
             <div class="map-hint" id="mapHint">Rueda para acercar, arrastra para moverte y haz clic en una luz.</div>
           </div>
         </div>
@@ -286,6 +287,7 @@
       </article>
     </template>
 
+    <script src="vendor/leaflet/leaflet.js"></script>
     <script src="app.js?v=20260507-config-footer"></script>
   </body>
 </html>

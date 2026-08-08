@@ -722,7 +722,10 @@ function withSecurityHeaders(response: Response): Response {
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("X-Frame-Options", "DENY");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:");
+  headers.set(
+    "Content-Security-Policy",
+    "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org",
+  );
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -1293,8 +1296,9 @@ const WEB_FILES: Record<string, true> = {
 };
 const ADMIN_FILES: Record<string, true> = { "/admin.html": true, "/admin.js": true };
 const ROOT_FILES: Record<string, true> = { "/config.json": true };
-// Public directory prefixes served from web/ (e.g. logos under /assets/).
-const WEB_DIRS = ["/assets/"];
+// Public directory prefixes served from web/ (e.g. logos under /assets/, vendored
+// browser libs under /vendor/ such as Leaflet's css/js and marker images).
+const WEB_DIRS = ["/assets/", "/vendor/"];
 
 // Confine a resolved path to its base dir, defeating traversal via `..`.
 function confineToDir(baseDir: string, cleaned: string): string | null {

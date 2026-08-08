@@ -12,7 +12,7 @@ The MVP uses SQLite as the server's local database:
 - Uploaded images: `uploads/`
 - Admin secrets: `.dev` (git-ignored)
 - Public configuration: `config.json`
-- Server: Bun (JavaScript/TypeScript runtime) with built-in SQLite support (`bun:sqlite`), no external dependencies
+- Server: Bun (JavaScript/TypeScript runtime) with built-in SQLite support (`bun:sqlite`), no external runtime dependencies. The frontend vendors a single browser library, Leaflet, as static assets under `web/vendor/leaflet/` for the OpenStreetMap map.
 
 SQLite is the right choice for this phase: it needs no separate database service, backups are a single-file copy, and it comfortably handles a first moderated participatory campaign.
 
