@@ -159,6 +159,43 @@ server {
 
     client_max_body_size 8M;
 
+    # Security headers (defense in depth, complement server-side T013 headers)
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**Note on HTTPS:** When HTTPS is enabled (see "Production security note" below), create a second block with `listen 443 ssl http2` and include `Strict-Transport-Security` header. Browsers ignore HSTS over plain HTTP per RFC 6797, so it belongs only on the HTTPS block:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name mapamundi.2031granadaideal.es;
+
+    # TLS certificates (e.g., from Let's Encrypt via Certbot)
+    ssl_certificate /etc/letsencrypt/live/mapamundi.2031granadaideal.es/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mapamundi.2031granadaideal.es/privkey.pem;
+
+    client_max_body_size 8M;
+
+    # Security headers (same as HTTP block, plus HSTS which only works on HTTPS)
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'" always;
+
     location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
