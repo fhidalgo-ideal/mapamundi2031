@@ -273,8 +273,8 @@ function renderStats() {
 }
 
 const HERO_POLAROID_FALLBACKS = [
-  { photo: "/demo/berlin.svg", city: "Berlin" },
-  { photo: "/demo/buenos-aires.svg", city: "Buenos Aires" },
+  { photo: "/uploads/824f6704-0caa-4882-9786-6b79f5e9b6f6.jpg", city: "Berlin" },
+  { photo: "/uploads/4bbd2721-5fd7-4132-8faa-158c564ee03f.jpg", city: "Buenos Aires" },
 ];
 
 function renderHeroPolaroids() {

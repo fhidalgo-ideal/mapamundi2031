@@ -117,102 +117,6 @@ const COUNTRY_FALLBACK: Record<string, [number, number]> = {
   "estados unidos": [37.0902, -95.7129],
 };
 
-interface SeedTrace {
-  id: string;
-  name: string;
-  email: string;
-  city: string;
-  country: string;
-  lat: number;
-  lng: number;
-  relation: string;
-  emotion: string;
-  feeling: string;
-  photo: string;
-  status: string;
-  createdAt: string;
-}
-
-const SEED_TRACES: SeedTrace[] = [
-  {
-    id: "seed-berlin",
-    name: "Clara Munoz",
-    email: "clara@example.com",
-    city: "Berlin",
-    country: "Alemania",
-    lat: 52.52,
-    lng: 13.405,
-    relation: "Erasmus en Granada",
-    emotion: "nostalgia",
-    feeling: "Encontre una baldosa azul en Kreuzberg que me llevo de golpe a las tardes del Albaicin.",
-    photo: "/demo/berlin.svg",
-    status: "approved",
-    createdAt: "2026-04-12T10:30:00+00:00",
-  },
-  {
-    id: "seed-buenos-aires",
-    name: "Mateo Rivas",
-    email: "mateo@example.com",
-    city: "Buenos Aires",
-    country: "Argentina",
-    lat: -34.6037,
-    lng: -58.3816,
-    relation: "Familia o comunidad granadina",
-    emotion: "pertenencia",
-    feeling: "Mi abuela aun cocina con palabras de Granada. La ciudad vive en nuestra mesa los domingos.",
-    photo: "/demo/buenos-aires.svg",
-    status: "approved",
-    createdAt: "2026-03-02T16:20:00+00:00",
-  },
-  {
-    id: "seed-tokyo",
-    name: "Aiko Tanaka",
-    email: "aiko@example.com",
-    city: "Tokio",
-    country: "Japon",
-    lat: 35.6762,
-    lng: 139.6503,
-    relation: "Visitante",
-    emotion: "asombro",
-    feeling: "Una guitarra en una estacion de Tokio me devolvio el eco de una noche de flamenco en Sacromonte.",
-    photo: "/demo/tokyo.svg",
-    status: "approved",
-    createdAt: "2026-02-18T08:12:00+00:00",
-  },
-  {
-    id: "seed-rabat",
-    name: "Nadia El Amrani",
-    email: "nadia@example.com",
-    city: "Rabat",
-    country: "Marruecos",
-    lat: 34.0209,
-    lng: -6.8416,
-    relation: "Artista o investigador/a",
-    emotion: "futuro",
-    feeling:
-      "Investigar Al-Andalus desde Rabat hace que Granada parezca una conversacion abierta, no un archivo cerrado.",
-    photo: "/demo/rabat.svg",
-    status: "pending",
-    createdAt: "2026-05-01T12:00:00+00:00",
-  },
-  {
-    id: "seed-estambul",
-    name: "Yusuf Aydin",
-    email: "yusuf@example.com",
-    city: "Estambul",
-    country: "Turquia",
-    lat: 41.0082,
-    lng: 28.9784,
-    relation: "Artista o investigador/a",
-    emotion: "asombro",
-    feeling:
-      "Al atardecer, la silueta de las cupulas sobre el Bosforo me recuerda el perfil de la Alhambra recortado sobre Sierra Nevada.",
-    photo: "/assets/estambul.jpg",
-    status: "approved",
-    createdAt: "2026-06-20T18:45:00+00:00",
-  },
-];
-
 function ensureConfig() {
   if (existsSync(CONFIG_PATH)) return;
   writeFileSync(CONFIG_PATH, JSON.stringify({ public: DEFAULT_PUBLIC_CONFIG }, null, 2), "utf-8");
@@ -699,23 +603,6 @@ function stripExif(data: Uint8Array, kind: string): Uint8Array {
   }
 
   return data;
-}
-
-function demoSvg(label: string, colorA: string, colorB: string): Uint8Array {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
-  <defs>
-    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="${colorA}"/>
-      <stop offset="1" stop-color="${colorB}"/>
-    </linearGradient>
-  </defs>
-  <rect width="900" height="600" fill="url(#g)"/>
-  <path d="M95 420c122-96 244-138 366-126 134 13 222 99 344 35" fill="none" stroke="rgba(255,255,255,.46)" stroke-width="18" stroke-linecap="round"/>
-  <circle cx="284" cy="212" r="54" fill="rgba(255,255,255,.22)"/>
-  <circle cx="630" cy="184" r="28" fill="rgba(255,255,255,.25)"/>
-  <text x="72" y="524" fill="white" font-family="Arial, sans-serif" font-size="42" font-weight="700">${label}</text>
-</svg>`;
-  return new TextEncoder().encode(svg);
 }
 
 function withSecurityHeaders(response: Response): Response {
@@ -1292,20 +1179,6 @@ async function handleSelfDeleteTrace(request: Request, traceId: string): Promise
   return jsonResponse({ deleted: true, id: traceId });
 }
 
-const DEMOS: Record<string, [string, string, string]> = {
-  "/demo/berlin.svg": ["Berlin recuerda Granada", "#263e60", "#f26d5b"],
-  "/demo/buenos-aires.svg": ["Mesa granadina", "#21483d", "#f7c667"],
-  "/demo/tokyo.svg": ["Eco del Sacromonte", "#103546", "#67d7c4"],
-  "/demo/rabat.svg": ["Conversacion abierta", "#302854", "#b896ff"],
-};
-
-function handleDemoImage(path: string): Response {
-  const demo = DEMOS[path];
-  if (!demo) return new Response("Not Found", { status: 404 });
-  const body = demoSvg(...demo);
-  return new Response(body, { headers: { "Content-Type": "image/svg+xml; charset=utf-8" } });
-}
-
 // Explicit allowlist: every URL below maps to one specific on-disk folder, so
 // the backend source under api/, the .dev secrets file, and everything else in
 // ROOT_DIR stays unreachable just by virtue of living in the project directory.
@@ -1425,9 +1298,6 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
     }
     if (path.startsWith("/api/")) {
       return errorResponse("Endpoint de API no encontrado.", 404);
-    }
-    if (path.startsWith("/demo/")) {
-      return handleDemoImage(path);
     }
     return serveStatic(path);
   }

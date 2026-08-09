@@ -1,5 +1,24 @@
 import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
+import { existsSync, copyFileSync, mkdirSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+const BASE_DIR = dirname(import.meta.path);
+const ROOT_DIR = join(BASE_DIR, "..");
+const UPLOAD_DIR = process.env.GRANADA_UPLOAD_DIR ?? join(ROOT_DIR, "uploads");
+const SEED_PHOTOS_DIR = join(BASE_DIR, "seed-photos");
+
+// Seed photos ship as fixtures under api/seed-photos/<uuid>.jpg (tracked in git,
+// since uploads/ itself is runtime-only and gitignored) and get copied into the
+// real uploads folder on first seed, so they're served through the exact same
+// /uploads/<uuid>.jpg path as a real user-submitted photo — no special-cased route.
+function seedUploadPhotos(): void {
+  if (!existsSync(SEED_PHOTOS_DIR)) return;
+  mkdirSync(UPLOAD_DIR, { recursive: true });
+  for (const file of readdirSync(SEED_PHOTOS_DIR)) {
+    const dest = join(UPLOAD_DIR, file);
+    if (!existsSync(dest)) copyFileSync(join(SEED_PHOTOS_DIR, file), dest);
+  }
+}
 
 // MongoDB types for TypeScript - imported dynamically at runtime to avoid Bun load failure.
 // In SQLite mode, mongodb is never loaded, allowing bun run to work without the package.
@@ -78,7 +97,7 @@ const SEED_TRACES: SeedTrace[] = [
     relation: "Erasmus en Granada",
     emotion: "nostalgia",
     feeling: "Encontre una baldosa azul en Kreuzberg que me llevo de golpe a las tardes del Albaicin.",
-    photo: "/demo/berlin.svg",
+    photo: "/uploads/824f6704-0caa-4882-9786-6b79f5e9b6f6.jpg",
     status: "approved",
     createdAt: "2026-04-12T10:30:00+00:00",
   },
@@ -93,7 +112,7 @@ const SEED_TRACES: SeedTrace[] = [
     relation: "Familia o comunidad granadina",
     emotion: "pertenencia",
     feeling: "Mi abuela aun cocina con palabras de Granada. La ciudad vive en nuestra mesa los domingos.",
-    photo: "/demo/buenos-aires.svg",
+    photo: "/uploads/4bbd2721-5fd7-4132-8faa-158c564ee03f.jpg",
     status: "approved",
     createdAt: "2026-03-02T16:20:00+00:00",
   },
@@ -108,7 +127,7 @@ const SEED_TRACES: SeedTrace[] = [
     relation: "Visitante",
     emotion: "asombro",
     feeling: "Una guitarra en una estacion de Tokio me devolvio el eco de una noche de flamenco en Sacromonte.",
-    photo: "/demo/tokyo.svg",
+    photo: "/uploads/b930a5a2-5c60-416b-aade-1e48a13532cf.jpg",
     status: "approved",
     createdAt: "2026-02-18T08:12:00+00:00",
   },
@@ -124,7 +143,7 @@ const SEED_TRACES: SeedTrace[] = [
     emotion: "futuro",
     feeling:
       "Investigar Al-Andalus desde Rabat hace que Granada parezca una conversacion abierta, no un archivo cerrado.",
-    photo: "/demo/rabat.svg",
+    photo: "/uploads/ebf895ab-a319-4777-9d93-da15a2127b93.jpg",
     status: "pending",
     createdAt: "2026-05-01T12:00:00+00:00",
   },
@@ -140,7 +159,7 @@ const SEED_TRACES: SeedTrace[] = [
     emotion: "asombro",
     feeling:
       "Al atardecer, la silueta de las cupulas sobre el Bosforo me recuerda el perfil de la Alhambra recortado sobre Sierra Nevada.",
-    photo: "/assets/estambul.jpg",
+    photo: "/uploads/d4ab0d26-2df6-4c90-adad-dd3fe135f423.jpg",
     status: "approved",
     createdAt: "2026-06-20T18:45:00+00:00",
   },
@@ -199,6 +218,7 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
     // Seed traces if collection is empty
     const count = await tracesCollection.countDocuments();
     if (count === 0) {
+      seedUploadPhotos();
       for (const trace of SEED_TRACES) {
         const [lng, lat] = [trace.lng, trace.lat];
         await tracesCollection.insertOne({
@@ -295,6 +315,7 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
     };
 
     if (count === 0) {
+      seedUploadPhotos();
       const insert = sqliteDb.prepare(`
         INSERT INTO traces (
           id, name, email, city, country, lat, lng, relation, emotion,

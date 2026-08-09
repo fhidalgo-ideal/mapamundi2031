@@ -6,3 +6,4 @@ node_modules/
 # Estado local del agente / spec-kit (no se comparte)
 .claude/settings.local.json
 .specify/feature.json
+.env
