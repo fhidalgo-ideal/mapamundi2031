@@ -66,6 +66,131 @@ http://localhost:8080
 
 Important: don't open `web/index.html` by double-clicking it or via a separate static server. Photo uploads need this same application served from `api/server.ts`, because that's where the API, SQLite, and the `uploads/` folder live.
 
+## Running with Docker Compose (MongoDB stack)
+
+For development and small deployments, the project includes a complete containerized stack using Docker Compose:
+
+- **MongoDB** (`db` service): persistent document database at `mongodb://db:27017/granada2031`
+- **Bun API** (`api` service): Granada server backed by MongoDB instead of SQLite
+- **Nginx gateway** (`proxy` service): public site, admin panel, and API reverse proxy on port 80
+
+All services are isolated in a custom bridge network (`granada_net`), with health checks to ensure startup order and reliability.
+
+### Quick start with Docker Compose
+
+1. **Copy the environment template:**
+
+```bash
+cp .env.example .env
+```
+
+The `.env` file sets up MongoDB connection (`MONGO_URI`), database name (`MONGO_DB_NAME`), and paths for uploads and data. You can accept the defaults for local development, or customize the values for your environment.
+
+2. **Build and start all services:**
+
+```bash
+docker-compose up -d --build
+```
+
+The `--build` flag rebuilds the `api` and `proxy` images. The `-d` flag runs in the background. Docker Compose will:
+- Start the MongoDB container and wait for it to be healthy (via `mongosh ping`)
+- Build and start the API service, waiting for MongoDB to be ready
+- Build and start the Nginx gateway, waiting for the API to be healthy
+
+3. **Verify the stack is running:**
+
+```bash
+curl http://localhost/api/health
+```
+
+Expected response:
+
+```json
+{
+  "ok": true,
+  "service": "mapamundi",
+  "storage": "mongodb"
+}
+```
+
+Open `http://localhost` in your browser to see the public map and `http://localhost/admin/` for the admin panel.
+
+### Migrating SQLite data to MongoDB
+
+If you have an existing SQLite database (from running the server without Docker), the migration script safely upserts all documents into MongoDB without duplicating data.
+
+**Before migrating:** stop any running `api/server.ts` process to avoid locks on the SQLite file.
+
+1. **Run the migration against your local MongoDB:**
+
+```bash
+# Ensure the stack is running
+docker-compose up -d
+
+# Run the migration
+MONGO_URI=mongodb://localhost:27017/granada2031 bun run scripts/migrate-sqlite-to-mongo.ts
+```
+
+The script reads from `data/granada2031.sqlite3` (or `$GRANADA_DB_PATH` if set), imports all traces, photos, audit logs, and signup notifications into MongoDB, and prints progress:
+
+```
+[migrate] Migrated 42 traces
+[migrate] Migrated 87 trace photos
+[migrate] Migrated 15 audit log entries
+[migrate] Migrated 8 signups
+
+[migrate] ✓ Migration complete!
+[migrate] Summary:
+  - traces: 42
+  - trace_photos: 87
+  - audit_log: 15
+  - notify_signups: 8
+```
+
+2. **Verify the migration in MongoDB:**
+
+```bash
+docker exec granada-db mongosh granada2031 --eval "db.traces.countDocuments()"
+```
+
+The count should match the number of traces in your original SQLite database.
+
+3. **Idempotency check** (safe to re-run):
+
+The script uses `upsert` internally, so running it a second time is safe. Each row is processed again and the summary will show the same counts (confirming no documents were duplicated):
+
+```bash
+MONGO_URI=mongodb://localhost:27017/granada2031 bun run scripts/migrate-sqlite-to-mongo.ts
+```
+
+You will see the same summary output again — no duplicates, no errors.
+
+### Stopping and cleaning up
+
+To stop all services:
+
+```bash
+docker-compose down
+```
+
+To remove all volumes (database data, uploads, and app data):
+
+```bash
+docker-compose down -v
+```
+
+### Important: SQLite still works without Docker
+
+Plain `bun run api/server.ts` with no Docker and no `MONGO_URI` environment variable continues to use SQLite exactly as before. The MongoDB feature is **optional** — you can use either backend, and the fallback is permanent.
+
+To run SQLite mode locally:
+
+```bash
+bun run api/server.ts --host 0.0.0.0 --port 8080
+```
+
+Logs will show `[api] Database: SQLite`. No Docker, no external services required.
+
 ## Testing
 
 ### SQLite smoke tests (default)
