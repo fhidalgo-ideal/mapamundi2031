@@ -1,0 +1,19 @@
+FROM nginx:alpine
+
+# Copy custom nginx configuration
+COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+
+# Copy web content
+COPY web/ /var/www/html/
+
+# Copy admin panel
+COPY admin/ /var/www/html/admin/
+
+# Create directory for uploads volume mount (will be mounted at runtime)
+RUN mkdir -p /var/www/uploads
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx in the foreground
+CMD ["nginx", "-g", "daemon off;"]
