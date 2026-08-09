@@ -1,0 +1,77 @@
+version: '3.9'
+
+services:
+  # MongoDB database service
+  db:
+    image: mongo:7.0
+    container_name: granada-db
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-granada2031}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - granada_net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # API service (Bun server)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: granada-api
+    ports:
+      - "8080:8080"
+    environment:
+      MONGO_URI: ${MONGO_URI:-mongodb://db:27017/granada2031}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-granada2031}
+      GRANADA_DB_PATH: ${GRANADA_DB_PATH:-/app/data/granada.db}
+      GRANADA_UPLOADS_PATH: ${GRANADA_UPLOADS_PATH:-/app/uploads}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+      - data_data:/app/data
+    networks:
+      - granada_net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Nginx proxy gateway
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    container_name: granada-gateway
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/var/www/uploads:ro
+    networks:
+      - granada_net
+
+volumes:
+  mongo_data:
+    driver: local
+  uploads_data:
+    driver: local
+  data_data:
+    driver: local
+
+networks:
+  granada_net:
+    driver: bridge
