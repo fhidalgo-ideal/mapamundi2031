@@ -189,7 +189,7 @@ To run SQLite mode locally:
 bun run api/server.ts --host 0.0.0.0 --port 8080
 ```
 
-Logs will show `[api] Database: SQLite`. No Docker, no external services required.
+Logs will show `[db.ts] SQLite initialized at ...`. No Docker, no external services required.
 
 ## Testing
 
