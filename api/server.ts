@@ -1,5 +1,22 @@
 #!/usr/bin/env bun
-import { Database } from "bun:sqlite";
+import {
+  initDatabase,
+  isMongoMode,
+  getTraces,
+  getTraceById,
+  createTrace,
+  addTracePhoto,
+  getTracePhotos,
+  updateTraceStatus,
+  updateTrace,
+  deleteTrace,
+  addAuditLog,
+  getAuditLogs,
+  addNotifySignup,
+  closeDatabase,
+  type TraceRecord,
+  type TracePhotoRecord,
+} from "./db.ts";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, resolve, sep } from "node:path";
@@ -335,132 +352,7 @@ function nowIso(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }
 
-let db: Database;
 
-function initDb() {
-  mkdirSync(DATA_DIR, { recursive: true });
-  mkdirSync(UPLOAD_DIR, { recursive: true });
-  db = new Database(DB_PATH);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS traces (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL,
-      city TEXT NOT NULL,
-      country TEXT NOT NULL,
-      lat REAL NOT NULL,
-      lng REAL NOT NULL,
-      relation TEXT NOT NULL,
-      emotion TEXT NOT NULL,
-      feeling TEXT NOT NULL,
-      photo TEXT NOT NULL,
-      status TEXT NOT NULL CHECK(status IN ('pending', 'approved', 'rejected')),
-      consent INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    )
-  `);
-  const traceColumns = db.query("PRAGMA table_info(traces)").all() as { name: string }[];
-  if (!traceColumns.some((col) => col.name === "deletion_token_hash")) {
-    db.exec("ALTER TABLE traces ADD COLUMN deletion_token_hash TEXT");
-  }
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS audit_log (
-      id TEXT PRIMARY KEY,
-      action TEXT NOT NULL,
-      trace_id TEXT,
-      source_ip TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    )
-  `);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS notify_signups (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      created_at TEXT NOT NULL
-    )
-  `);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS trace_photos (
-      id TEXT PRIMARY KEY,
-      trace_id TEXT NOT NULL,
-      path TEXT NOT NULL,
-      position INTEGER NOT NULL,
-      created_at TEXT NOT NULL
-    )
-  `);
-  const { count } = db.query("SELECT COUNT(*) as count FROM traces").get() as { count: number };
-  if (count === 0) {
-    const insert = db.prepare(`
-      INSERT INTO traces (
-        id, name, email, city, country, lat, lng, relation, emotion,
-        feeling, photo, status, consent, created_at
-      )
-      VALUES ($id, $name, $email, $city, $country, $lat, $lng, $relation,
-        $emotion, $feeling, $photo, $status, 1, $createdAt)
-    `);
-    const insertMany = db.transaction((traces: SeedTrace[]) => {
-      for (const trace of traces) {
-        insert.run({
-          $id: trace.id,
-          $name: trace.name,
-          $email: trace.email,
-          $city: trace.city,
-          $country: trace.country,
-          $lat: trace.lat,
-          $lng: trace.lng,
-          $relation: trace.relation,
-          $emotion: trace.emotion,
-          $feeling: trace.feeling,
-          $photo: trace.photo,
-          $status: trace.status,
-          $createdAt: trace.createdAt,
-        });
-      }
-    });
-    insertMany(SEED_TRACES);
-  }
-}
-
-interface TraceRow {
-  id: string;
-  name: string;
-  email: string;
-  city: string;
-  country: string;
-  lat: number;
-  lng: number;
-  relation: string;
-  emotion: string;
-  feeling: string;
-  photo: string;
-  status: string;
-  created_at: string;
-  deletion_token_hash: string | null;
-}
-
-function rowToTrace(row: TraceRow) {
-  // Extra photos (2nd onward) live in trace_photos; the cover is traces.photo.
-  // photos[] exposes the full ordered set: cover first, then extras by position.
-  const extras = db
-    .query("SELECT path FROM trace_photos WHERE trace_id = ? ORDER BY position ASC")
-    .all(row.id) as { path: string }[];
-  return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    city: row.city,
-    country: row.country,
-    lat: row.lat,
-    lng: row.lng,
-    relation: row.relation,
-    emotion: row.emotion,
-    feeling: row.feeling,
-    photo: row.photo,
-    photos: [row.photo, ...extras.map((e) => e.path)],
-    status: row.status,
-    createdAt: row.created_at,
-  };
-}
 
 function base64UrlEncode(data: Buffer): string {
   return data.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -863,65 +755,66 @@ function requireAdmin(request: Request): Response | null {
   return null;
 }
 
-function handleGetTraces(): Response {
-  const rows = db
-    .query("SELECT * FROM traces WHERE status = 'approved' ORDER BY datetime(created_at) DESC")
-    .all() as TraceRow[];
-  return jsonResponse({ traces: rows.map(rowToTrace) });
+async function handleGetTraces(): Promise<Response> {
+  const dbTraces = await getTraces(true); // approvedOnly = true
+  const traces = await Promise.all(dbTraces.map(dbTraceToPublic));
+  return jsonResponse({ traces });
 }
 
-function handleGetAdminTraces(): Response {
-  const rows = db
-    .query(
-      `SELECT * FROM traces
-       ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, datetime(created_at) DESC`,
-    )
-    .all() as TraceRow[];
-  return jsonResponse({ traces: rows.map(rowToTrace) });
-}
-
-interface AuditLogRow {
-  id: string;
-  action: string;
-  trace_id: string | null;
-  source_ip: string;
-  created_at: string;
-}
-
-function rowToAuditLogEntry(row: AuditLogRow) {
-  return {
-    id: row.id,
-    action: row.action,
-    traceId: row.trace_id,
-    sourceIp: row.source_ip,
-    createdAt: row.created_at,
-  };
+async function handleGetAdminTraces(): Promise<Response> {
+  const dbTraces = await getTraces(false); // approvedOnly = false, get all
+  const traces = await Promise.all(dbTraces.map(dbTraceToPublic));
+  return jsonResponse({ traces });
 }
 
 // Best-effort audit trail: an admin action must still succeed even if this
 // insert somehow throws, since losing an audit entry is preferable to
 // failing the action it is meant to record.
-function recordAuditLog(action: string, traceId: string | null, sourceIp: string): void {
+async function recordAuditLog(action: string, traceId: string | null, sourceIp: string): Promise<void> {
   try {
-    db.prepare(
-      `INSERT INTO audit_log (id, action, trace_id, source_ip, created_at)
-       VALUES ($id, $action, $traceId, $sourceIp, $createdAt)`,
-    ).run({
-      $id: randomUUID(),
-      $action: action,
-      $traceId: traceId,
-      $sourceIp: sourceIp,
-      $createdAt: nowIso(),
-    });
+    await addAuditLog(randomUUID(), action, traceId, sourceIp, nowIso());
   } catch (error) {
     console.error("No se pudo registrar la entrada de auditoria:", error);
   }
 }
 
+// Map db.ts TraceRecord to the public API shape: fetch extra photos, build photos[],
+// rename created_at→createdAt, and strip private fields (deletion_token_hash, consent).
+async function dbTraceToPublic(trace: TraceRecord) {
+  const extraPhotos = await getTracePhotos(trace.id);
+  return {
+    id: trace.id,
+    name: trace.name,
+    email: trace.email,
+    city: trace.city,
+    country: trace.country,
+    lat: trace.lat,
+    lng: trace.lng,
+    relation: trace.relation,
+    emotion: trace.emotion,
+    feeling: trace.feeling,
+    photo: trace.photo,
+    photos: [trace.photo, ...extraPhotos.map((p) => p.path)],
+    status: trace.status,
+    createdAt: trace.created_at,
+  };
+}
+
+// Map db.ts AuditLogRecord to the public API shape: rename snake_case to camelCase.
+function dbAuditLogToPublic(entry: { id: string; action: string; trace_id: string | null; source_ip: string; created_at: string }) {
+  return {
+    id: entry.id,
+    action: entry.action,
+    traceId: entry.trace_id,
+    sourceIp: entry.source_ip,
+    createdAt: entry.created_at,
+  };
+}
+
 const AUDIT_LOG_DEFAULT_LIMIT = 50;
 const AUDIT_LOG_MAX_LIMIT = 200;
 
-function handleGetAuditLog(request: Request): Response {
+async function handleGetAuditLog(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const rawLimit = Number(url.searchParams.get("limit") ?? AUDIT_LOG_DEFAULT_LIMIT);
   const rawOffset = Number(url.searchParams.get("offset") ?? 0);
@@ -930,12 +823,16 @@ function handleGetAuditLog(request: Request): Response {
     : AUDIT_LOG_DEFAULT_LIMIT;
   const offset = Number.isFinite(rawOffset) ? Math.max(0, Math.trunc(rawOffset)) : 0;
 
-  const rows = db
-    .query("SELECT * FROM audit_log ORDER BY datetime(created_at) DESC, rowid DESC LIMIT ? OFFSET ?")
-    .all(limit, offset) as AuditLogRow[];
-  const { total } = db.query("SELECT COUNT(*) as total FROM audit_log").get() as { total: number };
+  // db.ts getAuditLogs doesn't support offset or return a separate count.
+  // Fetch a large batch to approximate total (up to 10k entries) and slice for pagination.
+  // This reproduces the old COUNT(*) behavior for reasonably-sized audit logs.
+  const FETCH_CAP = 10000;
+  const allEntries = await getAuditLogs(FETCH_CAP);
+  const total = allEntries.length; // True count up to FETCH_CAP; matches old COUNT(*) intent
+  const paginatedEntries = allEntries.slice(offset, offset + limit);
+  const entries = paginatedEntries.map(dbAuditLogToPublic);
 
-  return jsonResponse({ entries: rows.map(rowToAuditLogEntry), total, limit, offset });
+  return jsonResponse({ entries, total, limit, offset });
 }
 
 async function handleAdminLogin(request: Request, server?: IpResolvingServer): Promise<Response> {
@@ -1220,47 +1117,14 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
     deletion_token_hash: deletionTokenHash,
   };
 
-  db.prepare(
-    `INSERT INTO traces (
-      id, name, email, city, country, lat, lng, relation, emotion,
-      feeling, photo, status, consent, created_at, deletion_token_hash
-    ) VALUES ($id, $name, $email, $city, $country, $lat, $lng, $relation,
-      $emotion, $feeling, $photo, $status, $consent, $created_at, $deletion_token_hash)`,
-  ).run({
-    $id: trace.id,
-    $name: trace.name,
-    $email: trace.email,
-    $city: trace.city,
-    $country: trace.country,
-    $lat: trace.lat,
-    $lng: trace.lng,
-    $relation: trace.relation,
-    $emotion: trace.emotion,
-    $feeling: trace.feeling,
-    $photo: trace.photo,
-    $status: trace.status,
-    $consent: trace.consent,
-    $created_at: trace.created_at,
-    $deletion_token_hash: trace.deletion_token_hash,
-  });
+  await createTrace(trace as TraceRecord);
 
-  if (extraPhotoRows.length > 0) {
-    const insertPhoto = db.prepare(
-      `INSERT INTO trace_photos (id, trace_id, path, position, created_at)
-       VALUES ($id, $trace_id, $path, $position, $created_at)`,
-    );
-    for (const extra of extraPhotoRows) {
-      insertPhoto.run({
-        $id: extra.id,
-        $trace_id: traceId,
-        $path: extra.path,
-        $position: extra.position,
-        $created_at: extra.created_at,
-      });
-    }
+  for (const extra of extraPhotoRows) {
+    await addTracePhoto(trace.id, extra.id, extra.path, extra.position, extra.created_at);
   }
 
-  return jsonResponse({ trace: rowToTrace(trace as unknown as TraceRow), deletionToken }, 201);
+  const publicTrace = await dbTraceToPublic(trace as TraceRecord);
+  return jsonResponse({ trace: publicTrace, deletionToken }, 201);
 }
 
 // Loose "looks like an email" check: one @, no whitespace, a dotted domain.
@@ -1295,12 +1159,9 @@ async function handleNotifySignup(request: Request, server?: IpResolvingServer):
   if (!email || email.length > 180 || !EMAIL_PATTERN.test(email)) {
     return errorResponse("Introduce un correo electronico valido.");
   }
-
-  // Idempotent capture: a repeated address is silently accepted (INSERT OR
-  // IGNORE against the UNIQUE email column) so re-submitting still returns 201.
-  db.prepare(
-    "INSERT OR IGNORE INTO notify_signups (id, email, created_at) VALUES ($id, $email, $created_at)",
-  ).run({ $id: randomUUID(), $email: email.toLowerCase(), $created_at: nowIso() });
+  // Idempotent capture: addNotifySignup uses INSERT OR IGNORE (SQLite) or catches
+  // duplicate key errors (Mongo), so re-submitting the same email returns 201.
+  await addNotifySignup(randomUUID(), email.toLowerCase(), clientIp, nowIso());
 
   return jsonResponse({ ok: true }, 201);
 }
@@ -1316,13 +1177,17 @@ async function handleUpdateStatus(request: Request, traceId: string, server?: Ip
   if (typeof status !== "string" || !VALID_STATUSES.has(status)) {
     return errorResponse("Estado no valido.");
   }
-  const result = db.prepare("UPDATE traces SET status = ? WHERE id = ?").run(status, traceId);
-  if (result.changes === 0) {
+  const updated = await updateTraceStatus(traceId, status);
+  if (!updated) {
     return errorResponse("No existe esa contribucion.", 404);
   }
-  const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow;
-  recordAuditLog("update_status", traceId, getClientIp(request, server));
-  return jsonResponse({ trace: rowToTrace(row) });
+  const trace = await getTraceById(traceId);
+  if (!trace) {
+    return errorResponse("No existe esa contribucion.", 404);
+  }
+  await recordAuditLog("update_status", traceId, getClientIp(request, server));
+  const publicTrace = await dbTraceToPublic(trace);
+  return jsonResponse({ trace: publicTrace });
 }
 
 async function handleUpdateTrace(request: Request, traceId: string, server?: IpResolvingServer): Promise<Response> {
@@ -1351,17 +1216,17 @@ async function handleUpdateTrace(request: Request, traceId: string, server?: IpR
     return errorResponse("No hay campos para actualizar.");
   }
 
-  const assignments = Object.keys(updates)
-    .map((field) => `${field} = ?`)
-    .join(", ");
-  const values = [...Object.values(updates), traceId];
-  const result = db.prepare(`UPDATE traces SET ${assignments} WHERE id = ?`).run(...values);
-  if (result.changes === 0) {
+  const updated = await updateTrace(traceId, updates);
+  if (!updated) {
     return errorResponse("No existe esa contribucion.", 404);
   }
-  const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow;
-  recordAuditLog("update_trace", traceId, getClientIp(request, server));
-  return jsonResponse({ trace: rowToTrace(row) });
+  const trace = await getTraceById(traceId);
+  if (!trace) {
+    return errorResponse("No existe esa contribucion.", 404);
+  }
+  await recordAuditLog("update_trace", traceId, getClientIp(request, server));
+  const publicTrace = await dbTraceToPublic(trace);
+  return jsonResponse({ trace: publicTrace });
 }
 
 function hashDeletionToken(token: string): string {
@@ -1380,27 +1245,27 @@ function unlinkUploadFile(photoPath: string): void {
   }
 }
 
-function deleteTraceRow(row: TraceRow): void {
-  // Remove every file this trace owns: the cover (traces.photo) plus each extra
-  // in trace_photos, then the DB rows themselves — no orphaned files or rows.
-  const extras = db
-    .query("SELECT path FROM trace_photos WHERE trace_id = ?")
-    .all(row.id) as { path: string }[];
-  db.prepare("DELETE FROM trace_photos WHERE trace_id = ?").run(row.id);
-  db.prepare("DELETE FROM traces WHERE id = ?").run(row.id);
-  unlinkUploadFile(row.photo);
+async function deleteTraceRow(traceId: string): Promise<void> {
+  // Remove every file this trace owns: the cover plus each extra in trace_photos,
+  // then the DB rows themselves — no orphaned files or rows.
+  const trace = await getTraceById(traceId);
+  if (!trace) return;
+  
+  const extras = await getTracePhotos(traceId);
+  await deleteTrace(traceId);
+  
+  unlinkUploadFile(trace.photo);
   for (const extra of extras) {
     unlinkUploadFile(extra.path);
   }
 }
-
-function handleDeleteTrace(request: Request, traceId: string, server?: IpResolvingServer): Response {
-  const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow | undefined;
-  if (!row) {
+async function handleDeleteTrace(request: Request, traceId: string, server?: IpResolvingServer): Promise<Response> {
+  const trace = await getTraceById(traceId);
+  if (!trace) {
     return errorResponse("No existe esa contribucion.", 404);
   }
-  deleteTraceRow(row);
-  recordAuditLog("delete_trace", traceId, getClientIp(request, server));
+  await deleteTraceRow(traceId);
+  await recordAuditLog("delete_trace", traceId, getClientIp(request, server));
   return jsonResponse({ deleted: true, id: traceId });
 }
 
@@ -1409,21 +1274,21 @@ function handleDeleteTrace(request: Request, traceId: string, server?: IpResolvi
 // handleCreateTrace and never persisted in plaintext. Compared with
 // timingSafeEqual against the stored hash so a wrong guess can't be
 // distinguished by response timing.
-function handleSelfDeleteTrace(request: Request, traceId: string): Response {
-  const row = db.query("SELECT * FROM traces WHERE id = ?").get(traceId) as TraceRow | undefined;
-  if (!row) {
+async function handleSelfDeleteTrace(request: Request, traceId: string): Promise<Response> {
+  const trace = await getTraceById(traceId);
+  if (!trace) {
     return errorResponse("No existe esa contribucion.", 404);
   }
   const providedToken = request.headers.get("X-Deletion-Token") ?? "";
-  if (!providedToken || !row.deletion_token_hash) {
+  if (!providedToken || !trace.deletion_token_hash) {
     return errorResponse("Token de borrado no valido.", 403);
   }
   const provided = Buffer.from(hashDeletionToken(providedToken), "utf-8");
-  const stored = Buffer.from(row.deletion_token_hash, "utf-8");
+  const stored = Buffer.from(trace.deletion_token_hash, "utf-8");
   if (provided.length !== stored.length || !timingSafeEqual(provided, stored)) {
     return errorResponse("Token de borrado no valido.", 403);
   }
-  deleteTraceRow(row);
+  await deleteTraceRow(traceId);
   return jsonResponse({ deleted: true, id: traceId });
 }
 
@@ -1522,13 +1387,18 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
       return serveStatic("/aviso-legal.html");
     }
     if (path === "/api/health") {
+      const storage = isMongoMode() ? "mongodb" : "sqlite";
+      // Redact credentials from Mongo URI like plan.md's initDatabase log line
+      const database = isMongoMode()
+        ? (process.env.MONGO_URI ?? "").replace(/:\/\/[^@]+@/, "://<credentials>@")
+        : DB_PATH;
       return jsonResponse({
         ok: true,
         service: "mapamundi",
         version: APP_VERSION,
         baseDir: BASE_DIR,
-        storage: "sqlite",
-        database: DB_PATH,
+        storage,
+        database,
       });
     }
     if (path === "/api/config") {
@@ -1634,7 +1504,7 @@ function parseArgs(argv: string[]): { host: string; port: number } {
 
 if (import.meta.main) {
   const { host, port } = parseArgs(process.argv.slice(2));
-  initDb();
+  await initDatabase(DB_PATH, process.env.MONGO_URI);
   const server = Bun.serve({
     hostname: host,
     port,
@@ -1643,4 +1513,4 @@ if (import.meta.main) {
   console.log(`Granada 2031 escuchando en http://${server.hostname}:${server.port}`);
 }
 
-export { handleRequest, initDb };
+export { handleRequest };
