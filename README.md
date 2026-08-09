@@ -68,7 +68,9 @@ Important: don't open `web/index.html` by double-clicking it or via a separate s
 
 ## Testing
 
-The project has a single test file, `api/tests/smoke.test.ts`, run with Bun's built-in test runner:
+### SQLite smoke tests (default)
+
+The project has a smoke test file, `api/tests/smoke.test.ts`, run with Bun's built-in test runner:
 
 ```bash
 bun test
@@ -80,7 +82,42 @@ throwaway temp directory (via `GRANADA_DATA_DIR`, `GRANADA_UPLOAD_DIR`, `GRANADA
 touches `data/`, `uploads/`, `config.json`, or `.dev` in the project root. `bun test` exits
 non-zero with a clear failure message if any check fails — no extra flags needed.
 
-Extend `api/tests/smoke.test.ts` (don't add new test files) as new endpoints or behaviors land.
+### MongoDB smoke tests (optional, requires Docker)
+
+A second test file, `api/tests/smoke-mongo.test.ts`, mirrors the same scenarios but against a real
+MongoDB database. This test file is **skipped automatically** when `GRANADA_TEST_MONGO_URI` is unset,
+so machines without Docker/MongoDB installed will see tests reported as "skipped" rather than failed.
+
+To run the MongoDB smoke tests locally:
+
+1. **Start a throwaway MongoDB container:**
+
+```bash
+docker run --rm -d -p 27017:27017 --name granada-test-mongo mongo:7.0
+```
+
+2. **Export the MongoDB connection string:**
+
+```bash
+export GRANADA_TEST_MONGO_URI=mongodb://localhost:27017/granada2031-smoke
+```
+
+3. **Run the full test suite (both SQLite and MongoDB):**
+
+```bash
+bun test
+```
+
+4. **Clean up when done:**
+
+```bash
+docker stop granada-test-mongo
+```
+
+Both test files verify the exact same HTTP scenarios (health check, config, create trace, approval flow,
+delete, notifications) and confirm that the API works identically whether backed by SQLite or MongoDB.
+
+Extend `api/tests/smoke.test.ts` or `api/tests/smoke-mongo.test.ts` as new endpoints or behaviors land.
 
 ## Admin password
 
