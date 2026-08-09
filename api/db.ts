@@ -688,7 +688,7 @@ export async function closeDatabase(): Promise<void> {
 // traceToMongoDoc stores photos array for internal MongoDB use.
 // mongoDocToTrace intentionally omits photos (caller fetches separately via getTracePhotos).
 
-function traceToMongoDoc(trace: TraceRecord): Record<string, unknown> {
+export function traceToMongoDoc(trace: TraceRecord): Record<string, unknown> {
   const [lng, lat] = [trace.lng, trace.lat];
   return {
     id: trace.id,
@@ -717,7 +717,7 @@ function traceToMongoDoc(trace: TraceRecord): Record<string, unknown> {
 // CRITICAL: mongoDocToTrace does NOT include `photos` field.
 // This ensures identical shape between SQLite and MongoDB backends.
 // Callers fetch extra photos separately via getTracePhotos().
-function mongoDocToTrace(doc: Record<string, unknown>): TraceRecord {
+export function mongoDocToTrace(doc: Record<string, unknown>): TraceRecord {
   return {
     id: doc.id as string,
     name: doc.name as string,
@@ -736,3 +736,4 @@ function mongoDocToTrace(doc: Record<string, unknown>): TraceRecord {
     deletion_token_hash: (doc.deletion_token_hash ?? null) as string | null,
   };
 }
+
