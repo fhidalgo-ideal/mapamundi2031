@@ -31,6 +31,7 @@ jobs:
         # host, so the runner needs no toolchain of its own.
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
             --cpus=1 --memory=1g \
             -v "$PWD":/app -w /app \
             oven/bun:1-alpine \
@@ -60,6 +61,7 @@ jobs:
         run: |
           docker run --rm \
             --network container:granada-test-mongo \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
             --cpus=1 --memory=1g \
             -v "$PWD":/app -w /app \
             -e GRANADA_TEST_MONGO_URI="mongodb://127.0.0.1:27017/granada_test" \
