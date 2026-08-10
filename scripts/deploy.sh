@@ -63,8 +63,18 @@ if [ "$ALLOW_DIRTY" = false ]; then
   # Best effort: if the remote is unreachable the check below still runs
   # against whatever origin/main this checkout already knows about.
   git fetch --quiet origin main 2>/dev/null || true
-  if ! git merge-base --is-ancestor "$HEAD_SHA" origin/main 2>/dev/null; then
-    echo "HEAD (${HEAD_SHA}) is not on origin/main. Push it first, or pass --allow-dirty." >&2
+  ORIGIN_SHA=$(git rev-parse origin/main 2>/dev/null || echo "")
+  if [ -z "$ORIGIN_SHA" ]; then
+    echo "Cannot determine origin/main. Fetch it first, or pass --allow-dirty." >&2
+    exit 1
+  fi
+  # Equality, not ancestry: a queued CI run can be dispatched long after it was
+  # created — when a runner comes back online, say — and would otherwise happily
+  # redeploy a commit that main has already moved past, silently reverting
+  # everything merged since.
+  if [ "$HEAD_SHA" != "$ORIGIN_SHA" ]; then
+    echo "HEAD (${HEAD_SHA}) is not the tip of origin/main (${ORIGIN_SHA})." >&2
+    echo "Refusing to deploy stale or unpushed code. Pass --allow-dirty to override." >&2
     exit 1
   fi
 fi
