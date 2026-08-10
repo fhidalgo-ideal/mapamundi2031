@@ -39,8 +39,16 @@ docker exec "$DB_CONTAINER" mongodump \
   "${AUTH_ARGS[@]}" \
   --archive --gzip > "${DEST}/mongo.archive.gz"
 
-# Read the uploads out of the API container, which has the volume mounted.
-docker exec "$API_CONTAINER" tar czf - -C /app/uploads . > "${DEST}/uploads.tar.gz"
+# Read the uploads out of the API container, which has the volume mounted. On a
+# first deploy the API does not exist yet, so read the volume directly with a
+# throwaway container instead of failing the backup that guards the deploy.
+if docker inspect -f '{{.State.Running}}' "$API_CONTAINER" 2>/dev/null | grep -q true; then
+  docker exec "$API_CONTAINER" tar czf - -C /app/uploads . > "${DEST}/uploads.tar.gz"
+else
+  echo "Note: ${API_CONTAINER} is not running; reading the uploads volume directly."
+  docker run --rm -v "${PROJECT}_uploads_data:/uploads:ro" alpine:3 \
+    tar czf - -C /uploads . > "${DEST}/uploads.tar.gz"
+fi
 
 # Record what produced this backup, so a restore can tell which code version
 # the data belongs to.

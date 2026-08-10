@@ -60,7 +60,9 @@ if [ "$ALLOW_DIRTY" = false ]; then
     echo "Working tree has uncommitted changes. Commit and push them, or pass --allow-dirty." >&2
     exit 1
   fi
-  git fetch --quiet origin main || true
+  # Best effort: if the remote is unreachable the check below still runs
+  # against whatever origin/main this checkout already knows about.
+  git fetch --quiet origin main 2>/dev/null || true
   if ! git merge-base --is-ancestor "$HEAD_SHA" origin/main 2>/dev/null; then
     echo "HEAD (${HEAD_SHA}) is not on origin/main. Push it first, or pass --allow-dirty." >&2
     exit 1
