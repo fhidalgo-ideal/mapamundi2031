@@ -1,16 +1,20 @@
 name: Deploy
 
-# Deploys to the production host through the self-hosted runner installed
-# there. The runner checks the repo out into its own workspace and drives
-# docker compose from it; the fixed project name (granada) keeps the same
-# containers and named volumes in use no matter which directory the deploy
-# runs from, so data survives across runs.
+# Deploys to production through the self-hosted runner on that machine. The
+# workflow deliberately contains no deployment logic of its own: every step
+# lives in scripts/deploy.sh, which is also what you run by hand on the server
+# if Actions is unavailable. One procedure, two ways to trigger it.
+#
+# No secrets are needed or used here. The database credentials live in
+# /etc/granada/.env on the server, readable only by root, and never leave it.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+# Deploys are serialised and never cancelled halfway: interrupting one between
+# the migration and the restart would leave the stack in a state nobody chose.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -18,33 +22,21 @@ concurrency:
 jobs:
   deploy:
     runs-on: [self-hosted, granada]
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # deploy.sh verifies HEAD is on origin/main, which needs real history
+          # rather than the default single-commit checkout.
+          fetch-depth: 0
 
-      - name: Build and start stack
-        run: |
-          docker compose -p granada \
-            -f docker-compose.yml \
-            -f docker-compose.prod.yml \
-            up -d --build --remove-orphans
+      - name: Deploy
+        # No sudo: the runner user is in the docker group, and reads
+        # /etc/granada/.env plus writes /var/backups/granada through the
+        # granada group.
+        run: ./scripts/deploy.sh
 
-      - name: Wait for API health
-        run: |
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8080/api/health > /dev/null; then
-              echo "API healthy"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "API did not become healthy in 60s"
-          docker compose -p granada logs --tail=50 api
-          exit 1
-
-      - name: Check gateway responds
-        run: curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/
-
-      - name: Prune old build layers
+      - name: Report
         if: always()
-        run: docker image prune -f
+        run: docker compose -p granada ps

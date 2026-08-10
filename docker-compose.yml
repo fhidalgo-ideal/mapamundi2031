@@ -9,8 +9,19 @@ services:
       - "27017:27017"
     environment:
       MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-granada2031}
+      # Setting a root user is what turns authentication on. The defaults below
+      # only apply to local development; production values come from the env
+      # file on the server, which is not in this repository.
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-granada_root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-devrootpassword}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-granada2031}
+      MONGO_APP_USER: ${MONGO_APP_USER:-granada_app}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:-devapppassword}
     volumes:
       - mongo_data:/data/db
+      # Runs once, only when the data directory is empty, to create the
+      # least-privilege application user.
+      - ./docker/mongo-init:/docker-entrypoint-initdb.d:ro
     networks:
       - granada_net
     healthcheck:
@@ -29,7 +40,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      MONGO_URI: ${MONGO_URI:-mongodb://db:27017/granada2031}
+      MONGO_URI: ${MONGO_URI:-mongodb://${MONGO_APP_USER:-granada_app}:${MONGO_APP_PASSWORD:-devapppassword}@db:27017/${MONGO_DB_NAME:-granada2031}?authSource=${MONGO_DB_NAME:-granada2031}}
       MONGO_DB_NAME: ${MONGO_DB_NAME:-granada2031}
       GRANADA_DB_PATH: ${GRANADA_DB_PATH:-/app/data/granada.db}
       GRANADA_UPLOAD_DIR: ${GRANADA_UPLOAD_DIR:-/app/uploads}

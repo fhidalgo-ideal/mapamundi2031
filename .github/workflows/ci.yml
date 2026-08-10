@@ -1,0 +1,69 @@
+name: Tests
+
+# Runs on the same self-hosted runner as the deploy, so it costs no GitHub
+# minutes. That machine also serves production, so this workflow is written to
+# stay light: the SQLite suite needs no database at all, and the MongoDB suite
+# gets a single throwaway container capped at one CPU and 512 MB. Nothing here
+# touches the production stack — different container name, no published ports,
+# and a separate test database.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Only the newest run per branch matters; superseded runs are cancelled instead
+# of queueing up behind each other on the single runner.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: [self-hosted, granada]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: SQLite suite
+        # Runs inside the Bun image rather than against a Bun installed on the
+        # host, so the runner needs no toolchain of its own.
+        run: |
+          docker run --rm \
+            --cpus=1 --memory=1g \
+            -v "$PWD":/app -w /app \
+            oven/bun:1-alpine \
+            sh -c "bun install --frozen-lockfile && bun test api/tests/smoke.test.ts api/tests/db.test.ts"
+
+      - name: Start throwaway MongoDB
+        run: |
+          docker rm -f granada-test-mongo 2>/dev/null || true
+          docker run --rm -d --name granada-test-mongo \
+            --cpus=1 --memory=512m \
+            mongo:7.0 --quiet
+          for i in $(seq 1 30); do
+            if docker exec granada-test-mongo mongosh --quiet --eval 'db.adminCommand("ping")' > /dev/null 2>&1; then
+              echo "MongoDB ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Throwaway MongoDB did not become ready in 60s" >&2
+          exit 1
+
+      - name: MongoDB suite
+        # Shares the database container's network namespace, so the test suite
+        # reaches it on 127.0.0.1 without publishing a port on the host.
+        run: |
+          docker run --rm \
+            --network container:granada-test-mongo \
+            --cpus=1 --memory=1g \
+            -v "$PWD":/app -w /app \
+            -e GRANADA_TEST_MONGO_URI="mongodb://127.0.0.1:27017/granada_test" \
+            oven/bun:1-alpine \
+            sh -c "bun install --frozen-lockfile && bun test api/tests/smoke-mongo.test.ts"
+
+      - name: Clean up
+        if: always()
+        run: docker rm -f granada-test-mongo 2>/dev/null || true

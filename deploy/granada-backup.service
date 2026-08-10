@@ -1,0 +1,10 @@
+[Unit]
+Description=Granada mapamundi database and uploads backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mapamundi
+EnvironmentFile=/etc/granada/.env
+ExecStart=/opt/mapamundi/scripts/backup.sh scheduled

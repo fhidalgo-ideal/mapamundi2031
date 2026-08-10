@@ -11,6 +11,11 @@ RUN bun install --frozen-lockfile --production
 COPY api/ ./api/
 COPY config.json ./
 
+# Migration runner and its migrations: the deploy runs them from inside this
+# image, against the same code that is about to serve traffic.
+COPY scripts/ ./scripts/
+COPY migrations/ ./migrations/
+
 # Create data and uploads directories
 RUN mkdir -p /app/data /app/uploads
 

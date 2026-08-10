@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily backup of the Granada mapamundi database and uploads
+
+[Timer]
+# Nightly, with a randomised delay so the dump does not always land on the same
+# minute. Persistent catches up after the machine has been off.
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=20m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
