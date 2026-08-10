@@ -44,10 +44,15 @@ docker exec "$DB_CONTAINER" mongodump \
 # throwaway container instead of failing the backup that guards the deploy.
 if docker inspect -f '{{.State.Running}}' "$API_CONTAINER" 2>/dev/null | grep -q true; then
   docker exec "$API_CONTAINER" tar czf - -C /app/uploads . > "${DEST}/uploads.tar.gz"
-else
+elif docker volume inspect "${PROJECT}_uploads_data" > /dev/null 2>&1; then
   echo "Note: ${API_CONTAINER} is not running; reading the uploads volume directly."
   docker run --rm -v "${PROJECT}_uploads_data:/uploads:ro" alpine:3 \
     tar czf - -C /uploads . > "${DEST}/uploads.tar.gz"
+else
+  # First deploy: the volume does not exist yet. Mounting it here would have
+  # Docker create it outside Compose, which then warns on every later command.
+  echo "Note: no uploads volume yet; recording an empty archive."
+  tar czf "${DEST}/uploads.tar.gz" -T /dev/null
 fi
 
 # Record what produced this backup, so a restore can tell which code version
