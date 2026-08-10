@@ -491,12 +491,129 @@ uploads/
 
 ## Backup
 
-Stop the service, or take an atomic SQLite backup:
+For a local SQLite database, stop the service or take an atomic backup:
 
 ```bash
 sqlite3 data/granada2031.sqlite3 ".backup 'backup-granada2031.sqlite3'"
 tar -czf backup-uploads.tar.gz uploads/
 ```
+
+Production backups are covered under "Deployment" below.
+
+## Deployment
+
+Production runs the same two compose files as development, plus an overlay:
+
+```bash
+docker compose -p granada -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+`docker-compose.prod.yml` publishes nothing to a public interface. MongoDB gets
+no host port at all — Docker publishes past the firewall, so `27017:27017`
+would put the database on the internet — and the API and gateway bind to
+loopback. The host's own Nginx terminates TLS and proxies to the gateway on
+`127.0.0.1:8081`; see `deploy/nginx-mapamundi.conf`. When the stack is down or
+mid-restart, that vhost serves `deploy/maintenance.html` instead of a bare
+gateway error, preserving the 502/503/504 status so uptime checks still see a
+failure.
+
+### Configuration and credentials
+
+MongoDB requires authentication. Two accounts exist: a root account for
+administration and `mongodump`/`mongorestore`, and an application account with
+`readWrite` on the application database only. Both are created by
+`docker/mongo-init/01-app-user.js` the first time MongoDB initializes an empty
+data directory — changing the passwords afterwards means altering the users in
+the database, not just editing configuration.
+
+Production values live in `/etc/granada/.env` on the server, owned by `root`
+and readable by the `granada` group. They are not in this repository. For local
+development, `cp .env.example .env` gives you the same authenticated setup with
+development passwords, so what you run locally matches production rather than a
+simplified variant of it.
+
+### Deploying
+
+`scripts/deploy.sh` is the only deployment procedure. The GitHub Actions
+workflow calls it, and you call it directly on the server when Actions is
+unavailable — out of credit, offline, runner down. Both paths run identical
+steps, so a manual deploy cannot drift from a CI one.
+
+```bash
+# On the server, as the fallback path:
+cd /opt/mapamundi
+./scripts/deploy.sh --pull
+```
+
+It refuses by default to deploy a working tree with uncommitted changes, or a
+commit that is not on `origin/main`, so production always corresponds to a
+commit someone else can look up. `--allow-dirty` overrides this for emergencies.
+
+The steps are: start the database, back up, build, apply pending migrations,
+start the new containers, wait for health. Migrations run before the new API
+serves traffic, so the application never meets a schema it does not understand.
+
+### Migrations
+
+Schema changes go in numbered files under `migrations/`, not in the boot path:
+
+```ts
+// migrations/0002-add-moderation-notes.ts
+export const description = "Add moderation_notes to traces"
+
+export async function up(db) {
+  await db.collection("traces").updateMany(
+    { moderation_notes: { $exists: false } },
+    { $set: { moderation_notes: [] } },
+  )
+}
+```
+
+Each file runs exactly once, in filename order, recorded in the
+`schema_migrations` collection.
+
+```bash
+docker compose -p granada run --rm --no-deps -T api bun run scripts/migrate.ts --status
+docker compose -p granada run --rm --no-deps -T api bun run scripts/migrate.ts
+```
+
+Write them additively — add a field, backfill it, and only drop the old one in a
+later migration once nothing reads it. That way the previous version of the
+application keeps working against the new schema, so rolling back code does not
+require restoring data.
+
+### Backups and restore
+
+`scripts/backup.sh` writes a `mongodump` archive, a tar of the uploads volume,
+and a manifest naming the commit and the row count into one timestamped
+directory under `/var/backups/granada`. It verifies both archives decompress
+before reporting success, and prunes past the retention window while always
+keeping the three most recent.
+
+It runs before every deploy and nightly from a systemd timer
+(`deploy/granada-backup.timer`).
+
+```bash
+scripts/restore.sh                          # list what is available
+scripts/restore.sh /var/backups/granada/... --yes
+```
+
+`restore.sh` takes a safety backup of the current state before overwriting
+anything, so a restore to the wrong snapshot is itself recoverable.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs the test suites on pull requests, and
+`deploy.yml` deploys pushes to `main`. Both use the self-hosted runner on the
+production host, which costs no GitHub minutes.
+
+Because that machine also serves production, the test workflow is kept
+deliberately cheap: the SQLite suite needs no database, the MongoDB suite gets a
+single throwaway container capped at one CPU and 512 MB, and superseded runs are
+cancelled rather than queued.
+
+Neither workflow uses secrets. The database credentials never leave
+`/etc/granada/.env` on the server.
 
 ## Production security note
 
