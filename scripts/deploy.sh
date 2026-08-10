@@ -112,7 +112,20 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-curl -fsS -o /dev/null -w 'gateway: %{http_code}\n' http://127.0.0.1:8081/
+# Retried like the API check above: when the gateway container has just been
+# recreated it briefly refuses connections, and a single attempt would fail a
+# deploy that actually succeeded.
+for i in $(seq 1 15); do
+  if curl -fsS -o /dev/null -w 'gateway: %{http_code}\n' http://127.0.0.1:8081/; then
+    break
+  fi
+  if [ "$i" -eq 15 ]; then
+    echo "Gateway did not respond in 30s. Recent logs:" >&2
+    compose logs --tail=50 proxy >&2
+    exit 1
+  fi
+  sleep 2
+done
 
 docker image prune -f > /dev/null
 echo "Deployed ${HEAD_SHA}"
