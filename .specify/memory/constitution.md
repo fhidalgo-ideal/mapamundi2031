@@ -1,161 +1,158 @@
 <!--
 Sync Impact Report
-- Cambio de versión: (plantilla sin rellenar) → 1.0.0
-- Principios definidos (los seis sustituyen a los marcadores de la plantilla):
-  - [PRINCIPLE_1_NAME] → I. Un único camino de despliegue
-  - [PRINCIPLE_2_NAME] → II. Los datos no se pierden
-  - [PRINCIPLE_3_NAME] → III. Los secretos viven en el servidor
-  - [PRINCIPLE_4_NAME] → IV. Desarrollo igual que producción
-  - [PRINCIPLE_5_NAME] → V. Pruebas contra el servicio real
-  - (nuevo) → VI. Privacidad de quien contribuye
-- Secciones añadidas:
-  - [SECTION_2_NAME] → Restricciones técnicas y de seguridad
-  - [SECTION_3_NAME] → Flujo de trabajo y puertas de calidad
-- Secciones eliminadas: ninguna
-- Pendientes: ninguno
+- Version change: 1.0.0 → 1.0.1
+- Principles: unchanged in substance; the document was rewritten in English to match
+  the rest of the repository (README, code comments, commit messages).
+  - I. Un único camino de despliegue → I. One Deployment Path
+  - II. Los datos no se pierden → II. Contributions Are Not Lost
+  - III. Los secretos viven en el servidor → III. Secrets Live On The Server
+  - IV. Desarrollo igual que producción → IV. Development Matches Production
+  - V. Pruebas contra el servicio real → V. Tests Drive The Real Service
+  - VI. Privacidad de quien contribuye → VI. Contributor Privacy
+- Sections renamed: Restricciones técnicas y de seguridad → Technical And Security
+  Constraints; Flujo de trabajo y puertas de calidad → Workflow And Quality Gates
+- Removed sections: none
+- Deferred items: none
 -->
 
-# Constitución de Granada 2031 — Mapamundi
+# Granada 2031 — Mapamundi Constitution
 
-Plataforma participativa donde personas de todo el mundo sitúan en un mapa su vínculo
-con Granada. Recoge datos personales y fotografías de gente real, y publica solo lo que
-un equipo humano ha revisado. Estos principios describen cómo se construye y se opera.
+A participatory platform where people around the world place their connection to Granada
+on a map. It collects personal data and photographs from real people, and publishes only
+what a human team has reviewed. These principles describe how it is built and operated.
 
 ## Core Principles
 
-### I. Un único camino de despliegue
+### I. One Deployment Path
 
-Existe un solo procedimiento de despliegue: `scripts/deploy.sh`. La automatización de
-CI lo invoca y una persona en el servidor lo invoca igual, con los mismos pasos y en el
-mismo orden. NO se admite un procedimiento manual alternativo "para emergencias": la
-emergencia es precisamente cuando un camino menos probado falla.
+There is a single deployment procedure: `scripts/deploy.sh`. CI invokes it and a person
+on the server invokes it, with the same steps in the same order. A separate manual
+procedure "for emergencies" MUST NOT exist: an emergency is precisely when the
+less-practised path fails.
 
-El despliegue DEBE rechazar cualquier commit que no sea la punta de `origin/main`, y
-cualquier árbol de trabajo con cambios sin registrar. Producción siempre corresponde a
-un commit que cualquiera puede consultar.
+A deploy MUST refuse any commit that is not the tip of `origin/main`, and any working
+tree with uncommitted changes. Production always corresponds to a commit anyone can look
+up.
 
-*Razón*: cuando el despliegue manual y el automático divergen, el que se usa bajo
-presión es el que nadie ha probado. Y una ejecución de CI encolada puede despacharse
-mucho después de crearse — al volver un runner caído, por ejemplo — y revertir en
-silencio todo lo integrado desde entonces.
+*Rationale*: when the manual and automated paths diverge, the one used under pressure is
+the one nobody has tested. And a queued CI run can be dispatched long after it was
+created — when an offline runner returns, say — silently reverting everything merged
+since.
 
-### II. Los datos no se pierden
+### II. Contributions Are Not Lost
 
-Las contribuciones son irreemplazables: nadie va a volver a escribir su recuerdo si se
-borra. Por tanto:
+Contributions are irreplaceable: nobody will write their memory a second time if it is
+deleted. Therefore:
 
-- Todo despliegue DEBE hacer una copia de seguridad antes de modificar nada, y esa copia
-  DEBE verificarse en el momento de crearse. Una copia que no se puede leer no es una
-  copia.
-- Los cambios de esquema van en ficheros numerados bajo `migrations/`, se aplican una
-  sola vez y en orden, y se ejecutan **antes** de que la nueva API atienda tráfico.
-- Las migraciones se escriben de forma aditiva: añadir un campo, rellenarlo, y eliminar
-  el antiguo solo en una migración posterior, cuando ya nada lo lee. La versión anterior
-  del código DEBE seguir funcionando contra el esquema nuevo.
-- La restauración se prueba, no se supone. Restaurar DEBE empezar por una copia del
-  estado actual, para que restaurar el punto equivocado también tenga vuelta atrás.
+- Every deploy MUST back up before changing anything, and that backup MUST be verified
+  as it is created. A backup that cannot be read back is not a backup.
+- Schema changes go in numbered files under `migrations/`, apply exactly once and in
+  order, and run **before** the new API serves traffic.
+- Migrations are written additively: add a field, backfill it, and drop the old one only
+  in a later migration once nothing reads it. The previous version of the code MUST keep
+  working against the new schema.
+- Restores are tested, not assumed. Restoring MUST begin by backing up current state, so
+  that restoring the wrong snapshot is itself recoverable.
 
-*Razón*: escribir migraciones de forma aditiva es lo que permite revertir el código sin
-restaurar datos, que es siempre la operación más lenta y arriesgada.
+*Rationale*: writing migrations additively is what lets a code rollback skip the restore,
+which is always the slowest and riskiest operation available.
 
-### III. Los secretos viven en el servidor
+### III. Secrets Live On The Server
 
-Las credenciales de producción residen en el servidor, bajo `/etc/granada/`, propiedad
-de `root` y legibles solo por quien las necesita. NUNCA se guardan en el repositorio, ni
-se derivan de valores por defecto del código.
+Production credentials live on the server under `/etc/granada/`, owned by `root` and
+readable only by what needs them. They are NEVER stored in the repository, and never
+derive from a default baked into the code.
 
-Ningún servicio del stack se publica en una interfaz pública. Los contenedores escuchan
-en `127.0.0.1` y el Nginx del anfitrión es el único punto de entrada, porque Docker
-publica puertos por delante del cortafuegos.
+No service in the stack is published on a public interface. Containers listen on
+`127.0.0.1` and the host's Nginx is the only entry point, because Docker publishes ports
+past the firewall.
 
-Todo valor por defecto que sirva como credencial (contraseña de administración, secreto
-de sesión, usuario de base de datos) DEBE ser inutilizable en producción: o se
-proporciona explícitamente, o el servicio no arranca con un valor conocido públicamente.
+Any default that acts as a credential — admin password, session secret, database user —
+MUST be unusable in production: either it is supplied explicitly, or the service does not
+come up with a publicly known value.
 
-*Razón*: un marcador de posición del repositorio funcionando como contraseña real es
-indistinguible de no tener contraseña.
+*Rationale*: a repository placeholder serving as a live password is indistinguishable
+from having no password at all.
 
-### IV. Desarrollo igual que producción
+### IV. Development Matches Production
 
-El entorno local usa los mismos ficheros de composición que producción, la misma base de
-datos y con la misma autenticación. La diferencia se limita a un overlay que ajusta
-puertos y desactiva el contenido de demostración.
+Local development uses the same compose files as production, the same database, and the
+same authentication. The difference is limited to an overlay that adjusts ports and
+disables demo content.
 
-Un cambio que solo funciona en local, o solo en producción, indica que la paridad se ha
-roto y DEBE corregirse antes de continuar.
+A change that works only locally, or only in production, means parity has broken and MUST
+be fixed before continuing.
 
-*Razón*: cada diferencia entre entornos es un fallo que solo aparece después de
-desplegar, cuando ya afecta a gente.
+*Rationale*: every difference between environments is a bug that surfaces after
+deploying, when it already affects people.
 
-### V. Pruebas contra el servicio real
+### V. Tests Drive The Real Service
 
-Las pruebas arrancan el servidor como proceso real y lo interrogan por HTTP, sobre
-directorios y bases de datos desechables. Cubren ambos backends de almacenamiento.
+Tests start the server as a real process and drive it over HTTP, against throwaway
+directories and databases. They cover both storage backends.
 
-Las pruebas NO DEBEN tocar los datos, las subidas ni la configuración de producción.
-Y DEBEN ser baratas de ejecutar: comparten máquina con el sitio en producción, así que
-se limitan sus recursos y se cancelan las ejecuciones superadas en lugar de encolarlas.
+Tests MUST NOT touch production data, uploads or configuration. They MUST also be cheap
+to run: they share a machine with the live site, so their resources are capped and
+superseded runs are cancelled rather than queued.
 
-Una prueba que se salta silenciosamente no protege nada: si una suite depende de una
-variable de entorno, algún trabajo de CI DEBE proporcionarla.
+A test that silently skips protects nothing: if a suite is gated on an environment
+variable, some CI job MUST provide it.
 
-*Razón*: los dobles de prueba confirman lo que creemos del sistema; solo el servicio
-arrancado confirma lo que hace.
+*Rationale*: test doubles confirm what we believe about the system; only the running
+service confirms what it does.
 
-### VI. Privacidad de quien contribuye
+### VI. Contributor Privacy
 
-Quien participa entrega su nombre, su correo y una fotografía a cambio de aparecer en un
-mapa. La API pública NO DEBE exponer datos personales que no sean necesarios para
-mostrar la contribución — el correo electrónico, en particular, nunca sale al público.
+People hand over their name, their email and a photograph in exchange for appearing on a
+map. The public API MUST NOT expose personal data beyond what displaying the contribution
+requires — email addresses in particular never reach the public.
 
-Ninguna contribución se publica sin revisión humana. Los endpoints que aprueban, editan
-o eliminan contribuciones están siempre autenticados.
+No contribution is published without human review. The endpoints that approve, edit or
+delete contributions are always authenticated.
 
-*Razón*: la confianza de quien participa es la materia prima del proyecto, y se pierde
-una sola vez.
+*Rationale*: the trust of the people taking part is the project's raw material, and it is
+lost only once.
 
-## Restricciones técnicas y de seguridad
+## Technical And Security Constraints
 
-- **Stack**: API en Bun (TypeScript), MongoDB como almacén principal con SQLite como
-  alternativa local, y Nginx como pasarela. El frontend no carga dependencias desde
-  CDN: se vendorizan como assets estáticos.
-- **Aislamiento**: el servidor de producción aloja otros servicios. Ningún cambio de
-  este proyecto puede degradarlos; los puertos, redes y volúmenes se declaran de forma
-  explícita y acotada.
-- **Copias**: diarias y antes de cada despliegue, con retención acotada que conserva
-  siempre las más recientes con independencia de su antigüedad.
-- **Interrupciones**: cuando el stack no responde, el sitio sirve una página de
-  mantenimiento que conserva el código de estado de error, para que las comprobaciones
-  automáticas sigan viendo el fallo.
+- **Stack**: Bun (TypeScript) API, MongoDB as the primary store with SQLite as the local
+  alternative, and Nginx as the gateway. The frontend loads no dependency from a CDN;
+  they are vendored as static assets.
+- **Isolation**: the production host runs other services. No change from this project may
+  degrade them; ports, networks and volumes are declared explicitly and narrowly.
+- **Backups**: nightly and before every deploy, with a bounded retention window that
+  always keeps the most recent ones regardless of age.
+- **Outages**: when the stack is unreachable, the site serves a maintenance page that
+  preserves the error status code, so automated checks still see a failure.
 
-## Flujo de trabajo y puertas de calidad
+## Workflow And Quality Gates
 
-- El trabajo se especifica antes de construirse; `specs/` conserva la especificación, el
-  plan y las tareas de cada funcionalidad.
-- Las pruebas se ejecutan en cada pull request. Solo el código y la configuración
-  disparan un despliegue: la documentación y las especificaciones no reconstruyen nada.
-- Cada despliegue termina comprobando que la API y la pasarela responden. Un despliegue
-  que no se puede verificar se considera fallido.
-- Los mensajes de commit explican por qué cambió algo y qué se rompía antes, no solo qué
-  fichero se tocó.
+- Work is specified before it is built; `specs/` holds each feature's specification, plan
+  and tasks.
+- Tests run on every pull request. Only code and configuration trigger a deploy:
+  documentation and specs rebuild nothing.
+- Every deploy ends by checking that the API and the gateway respond. A deploy that
+  cannot be verified counts as failed.
+- Commit messages explain why something changed and what was broken before, not just
+  which file was touched.
 
 ## Governance
 
-Esta constitución prevalece sobre cualquier otra práctica del proyecto. Cuando una
-decisión técnica entre en conflicto con estos principios, se cambia la decisión o se
-enmienda la constitución — no se ignora.
+This constitution supersedes other practices in the project. When a technical decision
+conflicts with these principles, the decision changes or the constitution is amended — it
+is not ignored.
 
-**Enmiendas**: se proponen por pull request, describiendo el principio afectado, el
-motivo del cambio y su efecto sobre el código existente. Una enmienda que invalide
-prácticas en curso DEBE incluir cómo se migra desde ellas.
+**Amendments**: proposed by pull request, describing the principle affected, the reason
+for the change, and its effect on existing code. An amendment that invalidates current
+practice MUST include how to migrate away from it.
 
-**Versionado**: MAJOR cuando se elimina o redefine un principio de forma incompatible;
-MINOR cuando se añade un principio o se amplía materialmente una guía; PATCH para
-aclaraciones y correcciones sin cambio de significado.
+**Versioning**: MAJOR when a principle is removed or redefined incompatibly; MINOR when a
+principle is added or guidance materially expanded; PATCH for clarifications and
+corrections that do not change meaning.
 
-**Cumplimiento**: toda revisión de código verifica que los cambios respetan estos
-principios. La complejidad añadida se justifica de forma explícita; en ausencia de
-justificación, se elige la opción más simple. El `README.md` documenta el detalle
-operativo — despliegue, migraciones, copias — y es la guía de referencia en el día a día.
+**Compliance**: every code review verifies that changes respect these principles. Added
+complexity is justified explicitly; absent a justification, the simpler option wins.
+`README.md` documents the operational detail — deployment, migrations, backups — and is
+the day-to-day reference.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-10 | **Last Amended**: 2026-08-10
+**Version**: 1.0.1 | **Ratified**: 2026-08-10 | **Last Amended**: 2026-08-10
