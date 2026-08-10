@@ -51,10 +51,11 @@ const map = L.map(worldMapEl, {
   worldCopyJump: true,
 });
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
   attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  maxZoom: 18,
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains: "abcd",
+  maxZoom: 20,
 }).addTo(map);
 
 // Leaflet needs a sized container; recompute once painted and on resize so
@@ -252,8 +253,6 @@ function openStory(trace) {
   document.querySelector("#storyFeeling").textContent = trace.feeling;
   document.querySelector("#storyRelation").textContent = trace.relation;
   document.querySelector("#storyDate").textContent = new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(trace.createdAt));
-  document.querySelector("#storyContact").textContent = trace.email;
-  document.querySelector("#storyContact").href = `mailto:${trace.email}`;
   storyPanel.classList.remove("hidden");
 }
 
@@ -455,9 +454,10 @@ function ensurePickerMap(lat, lng) {
   if (pickerMap) return;
   locationMapEl.hidden = false;
   pickerMap = L.map(locationMapEl, { zoomControl: true }).setView([lat, lng], 12);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 18,
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: "abcd",
+    maxZoom: 20,
   }).addTo(pickerMap);
   pickerMarker = L.marker([lat, lng], { draggable: true }).addTo(pickerMap);
   pickerMarker.on("dragend", () => {

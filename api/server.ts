@@ -665,7 +665,7 @@ function withSecurityHeaders(response: Response): Response {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org",
+    "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com",
   );
   return new Response(response.body, {
     status: response.status,
@@ -703,7 +703,11 @@ async function handleGetTraces(): Promise<Response> {
 
 async function handleGetAdminTraces(): Promise<Response> {
   const dbTraces = await getTraces(false); // approvedOnly = false, get all
-  const traces = await Promise.all(dbTraces.map(dbTraceToPublic));
+  // Admins need the contributor's email to moderate/contact; the public
+  // shape from dbTraceToPublic strips it, so it's added back here only.
+  const traces = await Promise.all(
+    dbTraces.map(async (trace) => ({ ...(await dbTraceToPublic(trace)), email: trace.email })),
+  );
   return jsonResponse({ traces });
 }
 
@@ -751,13 +755,13 @@ async function recordAuditLog(action: string, traceId: string | null, sourceIp: 
 }
 
 // Map db.ts TraceRecord to the public API shape: fetch extra photos, build photos[],
-// rename created_at→createdAt, and strip private fields (deletion_token_hash, consent).
+// rename created_at→createdAt, and strip private fields (deletion_token_hash, consent,
+// email — contributors' addresses are never exposed outside the admin panel).
 async function dbTraceToPublic(trace: TraceRecord) {
   const extraPhotos = await getTracePhotos(trace.id);
   return {
     id: trace.id,
     name: trace.name,
-    email: trace.email,
     city: trace.city,
     country: trace.country,
     lat: trace.lat,
