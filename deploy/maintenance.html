@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>En construcción · Mapamundi Granada 2031</title>
+    <style>
+      /* Deliberately self-contained: this page is what visitors get when the
+         application stack is unreachable, so it cannot depend on the gateway
+         for a stylesheet, a font file or an image. Palette and typography are
+         copied from web/styles.css. */
+      :root {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --surface: #121a2b;
+        --ink: #f6f1e8;
+        --muted: #aeb8c7;
+        --line: rgba(255, 255, 255, 0.14);
+        --gold: #f7c667;
+        --coral: #f26d5b;
+        --aqua: #67d7c4;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 2rem 1.25rem;
+        background: var(--bg);
+        color: var(--ink);
+        background-image:
+          radial-gradient(60rem 40rem at 15% -10%, rgba(247, 198, 103, 0.16), transparent 60%),
+          radial-gradient(50rem 35rem at 110% 10%, rgba(103, 215, 196, 0.12), transparent 60%);
+      }
+
+      main {
+        width: min(38rem, 100%);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 1.25rem;
+        padding: clamp(1.75rem, 5vw, 3rem);
+        box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.45);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--gold);
+        border: 1px solid rgba(247, 198, 103, 0.35);
+        border-radius: 999px;
+        padding: 0.4rem 0.85rem;
+      }
+
+      .dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: var(--gold);
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.25; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .dot { animation: none; }
+      }
+
+      h1 {
+        margin: 1.5rem 0 0;
+        font-size: clamp(1.75rem, 5vw, 2.5rem);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+
+      p {
+        margin: 1rem 0 0;
+        color: var(--muted);
+        line-height: 1.6;
+        font-size: 1.0625rem;
+      }
+
+      .rule {
+        margin: 2rem 0 0;
+        height: 1px;
+        border: 0;
+        background: var(--line);
+      }
+
+      footer {
+        margin-top: 1.25rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.25rem;
+        align-items: center;
+        font-size: 0.9375rem;
+        color: var(--muted);
+      }
+
+      a {
+        color: var(--aqua);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(103, 215, 196, 0.4);
+      }
+
+      a:hover,
+      a:focus-visible { color: var(--ink); }
+
+      .project {
+        color: var(--ink);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="badge"><span class="dot"></span> En construcción</span>
+      <h1>Estamos afinando el mapamundi</h1>
+      <p>
+        La web no está disponible en este momento porque estamos haciendo
+        cambios. No pierdes nada: vuelve a intentarlo en unos minutos y el mapa
+        volverá a estar aquí, con todas las huellas en su sitio.
+      </p>
+      <p>
+        Si necesitas contactar con el equipo mientras tanto, escríbenos a
+        <a href="mailto:info@cmacomunicacion.com">info@cmacomunicacion.com</a>.
+      </p>
+      <hr class="rule">
+      <footer>
+        <span class="project">Mapamundi · Granada 2031</span>
+        <span>Capitalidad Europea de la Cultura</span>
+      </footer>
+    </main>
+  </body>
+</html>
