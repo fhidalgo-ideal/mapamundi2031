@@ -55,6 +55,8 @@ jobs:
       - name: MongoDB suite
         # Shares the database container's network namespace, so the test suite
         # reaches it on 127.0.0.1 without publishing a port on the host.
+        # db.test.ts runs here as well: its MongoDB half is gated on
+        # GRANADA_TEST_MONGO_URI and would otherwise never execute anywhere.
         run: |
           docker run --rm \
             --network container:granada-test-mongo \
@@ -62,7 +64,7 @@ jobs:
             -v "$PWD":/app -w /app \
             -e GRANADA_TEST_MONGO_URI="mongodb://127.0.0.1:27017/granada_test" \
             oven/bun:1-alpine \
-            sh -c "bun install --frozen-lockfile && bun test api/tests/smoke-mongo.test.ts"
+            sh -c "bun install --frozen-lockfile && bun test api/tests/smoke-mongo.test.ts api/tests/db.test.ts"
 
       - name: Clean up
         if: always()
