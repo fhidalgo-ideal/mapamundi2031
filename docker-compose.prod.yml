@@ -20,6 +20,13 @@ services:
     environment:
       # Production starts empty: no demo traces, no demo photos.
       GRANADA_SEED: "false"
+    volumes:
+      # The admin credentials. Without this mount the API finds no secrets file
+      # and writes itself a default one — with the placeholder password that
+      # ships in this repository, on the endpoint that approves and deletes
+      # contributions. Mounting a real file also keeps the session secret
+      # stable, so a deploy no longer logs every moderator out.
+      - /etc/granada/admin-secrets.json:/app/.dev:ro
     restart: unless-stopped
 
   proxy:
