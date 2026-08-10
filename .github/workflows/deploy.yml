@@ -11,6 +11,17 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Only code and configuration reach the server. Documentation, specs and
+    # agent tooling change nothing about what runs there, so deploying them
+    # would rebuild images and restart containers for no reason.
+    # This is an ignore list rather than an allow list on purpose: a new source
+    # directory starts out deployable instead of being silently skipped.
+    paths-ignore:
+      - '**.md'
+      - 'specs/**'
+      - '.specify/**'
+      - '.claude/**'
+      - 'LICENSE'
   workflow_dispatch:
 
 # Deploys are serialised and never cancelled halfway: interrupting one between
