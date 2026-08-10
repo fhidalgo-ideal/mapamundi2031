@@ -1,0 +1,26 @@
+# Production overlay. Use together with docker-compose.yml:
+#
+#   docker compose -p granada -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# The host runs its own nginx (it also serves Odoo) and owns ports 80/443,
+# so nothing here binds to a public interface. The host nginx terminates TLS
+# for mapamundi.2031granadaideal.es and proxies to the gateway on 127.0.0.1:8081.
+services:
+  db:
+    # Never publish MongoDB. Docker publishes ports past the firewall, so a
+    # plain "27017:27017" would put an unauthenticated database on the internet.
+    ports: !reset null
+    restart: unless-stopped
+
+  api:
+    # Reachable from the host for debugging and for the migration script,
+    # but not from outside. Normal traffic goes through the gateway.
+    ports: !override
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  proxy:
+    # 8081 because the host nginx already holds 80.
+    ports: !override
+      - "127.0.0.1:8081:80"
+    restart: unless-stopped

@@ -1,0 +1,50 @@
+name: Deploy
+
+# Deploys to the production host through the self-hosted runner installed
+# there. The runner checks the repo out into its own workspace and drives
+# docker compose from it; the fixed project name (granada) keeps the same
+# containers and named volumes in use no matter which directory the deploy
+# runs from, so data survives across runs.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, granada]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start stack
+        run: |
+          docker compose -p granada \
+            -f docker-compose.yml \
+            -f docker-compose.prod.yml \
+            up -d --build --remove-orphans
+
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/api/health > /dev/null; then
+              echo "API healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become healthy in 60s"
+          docker compose -p granada logs --tail=50 api
+          exit 1
+
+      - name: Check gateway responds
+        run: curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/
+
+      - name: Prune old build layers
+        if: always()
+        run: docker image prune -f
