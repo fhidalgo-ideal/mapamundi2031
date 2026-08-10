@@ -1,0 +1,16 @@
+# Local development only. Plain `docker compose` commands (including
+# `docker compose watch`) merge this in automatically; the deploy script and
+# CI always pass explicit -f flags (docker-compose.yml + docker-compose.prod.yml),
+# which skips this file entirely, so production is unaffected.
+#
+# default.conf caches static assets for an hour, which is fine for production
+# but fights `docker compose watch`: edits sync into the container in about a
+# second, yet the browser keeps serving the stale cached index.html/app.js
+# until the hour is up, sometimes mixing an old script with a new page. This
+# swaps in a dev config that disables that caching so a normal refresh always
+# picks up the latest synced files.
+services:
+  proxy:
+    volumes: !override
+      - uploads_data:/var/www/uploads:ro
+      - ./docker/nginx/default.dev.conf:/etc/nginx/conf.d/default.conf:ro
