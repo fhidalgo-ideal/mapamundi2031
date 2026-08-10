@@ -20,7 +20,6 @@
       <div class="topbar-nav">
         <nav aria-label="Navegacion principal">
           <a href="#mapa">Mapa</a>
-          <a href="#participa" data-open-contribute>Participa</a>
         </nav>
         <button class="button nav-cta" type="button" data-open-contribute>Subir foto</button>
       </div>
@@ -84,7 +83,7 @@
           <article class="step-card">
             <div class="step-number">02</div>
             <h3>Elige como participar</h3>
-            <p>Indica tu ciudad, tu pais y la emocion que mejor describe tu recuerdo.</p>
+            <p>Busca tu ciudad en el mapa y elige la emocion que mejor describe tu recuerdo.</p>
           </article>
 
           <article class="step-card">
@@ -145,14 +144,20 @@
             Email de contacto
             <input name="email" type="email" autocomplete="email" required placeholder="nombre@email.com">
           </label>
-          <label>
-            Ciudad
-            <input name="city" list="cityOptions" required placeholder="Ej. Berlin">
-          </label>
-          <label>
-            Pais
-            <input name="country" required placeholder="Ej. Alemania">
-          </label>
+          <div class="location-picker wide">
+            <label>
+              Tu ciudad
+              <input id="citySearchInput" type="text" autocomplete="off" placeholder="Escribe tu ciudad y elige un resultado">
+            </label>
+            <ul class="location-picker-results" id="citySearchResults" hidden></ul>
+            <div class="location-picker-map" id="locationMap" hidden></div>
+            <p class="location-picker-summary" id="locationSummary" hidden></p>
+            <p class="location-picker-message" id="locationMessage" role="alert" hidden></p>
+            <input type="hidden" name="city" id="traceCityHidden">
+            <input type="hidden" name="country" id="traceCountryHidden">
+            <input type="hidden" name="lat" id="traceLatHidden">
+            <input type="hidden" name="lng" id="traceLngHidden">
+          </div>
           <label>
             Vinculo con Granada
             <select name="relation" required>
@@ -205,18 +210,6 @@
             <p id="formStatus" role="status"></p>
           </div>
         </form>
-        <datalist id="cityOptions">
-          <option value="Granada"></option>
-          <option value="Madrid"></option>
-          <option value="Paris"></option>
-          <option value="Berlin"></option>
-          <option value="Buenos Aires"></option>
-          <option value="Ciudad de Mexico"></option>
-          <option value="Nueva York"></option>
-          <option value="Tokio"></option>
-          <option value="Rabat"></option>
-          <option value="Londres"></option>
-        </datalist>
         </div>
       </div>
 

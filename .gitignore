@@ -7,3 +7,6 @@ node_modules/
 .claude/settings.local.json
 .specify/feature.json
 .env
+
+.DS_Store
+.worktrees/

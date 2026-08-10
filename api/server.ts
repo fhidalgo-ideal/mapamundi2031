@@ -52,6 +52,10 @@ const ADMIN_LOGIN_LOCKOUT_MAX = Number(process.env.GRANADA_ADMIN_LOGIN_LOCKOUT_M
 const ADMIN_LOGIN_LOCKOUT_WINDOW_MS = Number(
   process.env.GRANADA_ADMIN_LOGIN_LOCKOUT_WINDOW_MS ?? 15 * 60 * 1000,
 );
+const GEOCODE_SEARCH_RATE_LIMIT_MAX = Number(process.env.GRANADA_GEOCODE_SEARCH_RATE_LIMIT_MAX ?? 20);
+const GEOCODE_SEARCH_RATE_LIMIT_WINDOW_MS = Number(
+  process.env.GRANADA_GEOCODE_SEARCH_RATE_LIMIT_WINDOW_MS ?? 5 * 60 * 1000,
+);
 const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -200,13 +204,10 @@ let lastNominatimRequestAt = 0;
 // have and only want city-level coordinates). Returns null on any failure so
 // the caller can fall back deterministically; a contribution must never fail
 // to submit because geocoding did.
-async function geocodeCity(city: string, country: string): Promise<[number, number] | null> {
-  const url = new URL(NOMINATIM_ENDPOINT);
-  url.searchParams.set("city", city);
-  url.searchParams.set("country", country);
-  url.searchParams.set("format", "json");
-  url.searchParams.set("limit", "1");
-
+// Shared Nominatim call: enforces the 1 req/s usage-policy gate, sets the
+// required User-Agent, and applies a hard timeout. Returns null on any
+// network/parse failure so every caller can fall back deterministically.
+async function nominatimFetch(url: URL): Promise<unknown | null> {
   const waitMs = lastNominatimRequestAt + NOMINATIM_MIN_INTERVAL_MS - Date.now();
   if (waitMs > 0) {
     const { promise, resolve } = Promise.withResolvers<void>();
@@ -221,16 +222,68 @@ async function geocodeCity(city: string, country: string): Promise<[number, numb
       signal: AbortSignal.timeout(NOMINATIM_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    const results = (await response.json()) as Array<{ lat?: string; lon?: string }>;
-    const first = Array.isArray(results) ? results[0] : undefined;
-    if (!first || first.lat === undefined || first.lon === undefined) return null;
-    const lat = Number(first.lat);
-    const lng = Number(first.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return [lat, lng];
+    return await response.json();
   } catch {
     return null;
   }
+}
+
+async function geocodeCity(city: string, country: string): Promise<[number, number] | null> {
+  const url = new URL(NOMINATIM_ENDPOINT);
+  url.searchParams.set("city", city);
+  url.searchParams.set("country", country);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", "1");
+
+  const results = (await nominatimFetch(url)) as Array<{ lat?: string; lon?: string }> | null;
+  const first = Array.isArray(results) ? results[0] : undefined;
+  if (!first || first.lat === undefined || first.lon === undefined) return null;
+  const lat = Number(first.lat);
+  const lng = Number(first.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return [lat, lng];
+}
+
+interface PlaceSuggestion {
+  displayName: string;
+  city: string;
+  country: string;
+  lat: number;
+  lng: number;
+}
+
+// Free-text place search backing the form's city picker: the user types a
+// city name, picks one of these suggestions, and the exact lat/lng returned
+// here is what gets stored — the marker the user sees on the map IS the
+// point that lands in the database, not a separately re-derived guess.
+async function searchPlaces(query: string): Promise<PlaceSuggestion[]> {
+  const url = new URL(NOMINATIM_ENDPOINT);
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("limit", "5");
+
+  type NominatimResult = {
+    lat?: string;
+    lon?: string;
+    display_name?: string;
+    address?: Record<string, string>;
+  };
+  const results = (await nominatimFetch(url)) as NominatimResult[] | null;
+  if (!Array.isArray(results)) return [];
+
+  const suggestions: PlaceSuggestion[] = [];
+  for (const result of results) {
+    const lat = Number(result.lat);
+    const lng = Number(result.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const address = result.address ?? {};
+    const city = address.city ?? address.town ?? address.village ?? address.municipality ?? address.county ?? "";
+    const country = address.country ?? "";
+    if (!city || !country) continue;
+    suggestions.push({ displayName: result.display_name ?? `${city}, ${country}`, city, country, lat, lng });
+  }
+  return suggestions;
 }
 
 // Async coordinate resolution used by the write handlers. Order: in-memory
@@ -654,6 +707,38 @@ async function handleGetAdminTraces(): Promise<Response> {
   return jsonResponse({ traces });
 }
 
+// Backs the form's city picker: proxies Nominatim so the API key-less, rate
+// -limited, User-Agent-tagged call happens server-side instead of from the
+// browser (client-side calls would violate Nominatim's usage policy).
+async function handleGeocodeSearch(
+  request: Request,
+  server?: IpResolvingServer,
+): Promise<Response> {
+  const clientIp = getClientIp(request, server);
+  const rateLimit = checkGeocodeSearchRateLimit(clientIp);
+  if (rateLimit.limited) {
+    const response = errorResponse("Demasiadas busquedas. Intentalo en unos minutos.", 429);
+    response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
+    return response;
+  }
+
+  const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+  if (query.length < 2) {
+    return jsonResponse({ results: [] });
+  }
+
+  const suggestions = await searchPlaces(query);
+  return jsonResponse({
+    results: suggestions.map((s) => ({
+      displayName: s.displayName,
+      city: s.city,
+      country: s.country,
+      lat: s.lat,
+      lng: s.lng,
+    })),
+  });
+}
+
 // Best-effort audit trail: an admin action must still succeed even if this
 // insert somehow throws, since losing an audit entry is preferable to
 // failing the action it is meant to record.
@@ -803,6 +888,10 @@ const checkTraceRateLimit = createRateLimiter(TRACE_RATE_LIMIT_MAX, TRACE_RATE_L
 const checkNotifySignupRateLimit = createRateLimiter(
   NOTIFY_SIGNUP_RATE_LIMIT_MAX,
   NOTIFY_SIGNUP_RATE_LIMIT_WINDOW_MS,
+);
+const checkGeocodeSearchRateLimit = createRateLimiter(
+  GEOCODE_SEARCH_RATE_LIMIT_MAX,
+  GEOCODE_SEARCH_RATE_LIMIT_WINDOW_MS,
 );
 
 function createFailureLockout(maxFailures: number, windowMs: number) {
@@ -980,7 +1069,21 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
     });
   }
 
-  const [lat, lng] = await resolveCoordinatesAsync(values.city, values.country);
+  // The map picker sends the exact lat/lng of the pin the user placed/dragged
+  // — use it as-is so the point on the map matches what they actually chose.
+  // Fall back to geocoding city/country only when lat/lng are absent or
+  // malformed (e.g. an older or non-JS client).
+  const rawLatField = String(form.get("lat") ?? "").trim();
+  const rawLngField = String(form.get("lng") ?? "").trim();
+  const rawLat = Number(rawLatField);
+  const rawLng = Number(rawLngField);
+  const hasValidPickedCoords =
+    rawLatField !== "" && rawLngField !== "" &&
+    Number.isFinite(rawLat) && Number.isFinite(rawLng) &&
+    rawLat >= -90 && rawLat <= 90 && rawLng >= -180 && rawLng <= 180;
+  const [lat, lng] = hasValidPickedCoords
+    ? [rawLat, rawLng]
+    : await resolveCoordinatesAsync(values.city, values.country);
   // Deletion token: returned once in this response and never persisted in
   // plaintext, so a leaked DB dump alone can't be used to self-delete
   // someone else's contribution.
@@ -1279,6 +1382,9 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
     }
     if (path === "/api/traces") {
       return handleGetTraces();
+    }
+    if (normalizedPath === "/api/geocode/search") {
+      return handleGeocodeSearch(request, server);
     }
     if (normalizedPath === "/api/admin/traces") {
       const denied = requireAdmin(request);

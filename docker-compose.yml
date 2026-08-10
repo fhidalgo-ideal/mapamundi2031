@@ -32,7 +32,7 @@ services:
       MONGO_URI: ${MONGO_URI:-mongodb://db:27017/granada2031}
       MONGO_DB_NAME: ${MONGO_DB_NAME:-granada2031}
       GRANADA_DB_PATH: ${GRANADA_DB_PATH:-/app/data/granada.db}
-      GRANADA_UPLOADS_PATH: ${GRANADA_UPLOADS_PATH:-/app/uploads}
+      GRANADA_UPLOAD_DIR: ${GRANADA_UPLOAD_DIR:-/app/uploads}
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +47,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    develop:
+      watch:
+        # Code change -> sync into the running container and restart the Bun
+        # process (fast, no image rebuild). No manual `docker compose restart`.
+        - action: sync+restart
+          path: ./api
+          target: /app/api
+        - action: sync+restart
+          path: ./config.json
+          target: /app/config.json
+        # Dependency change -> only these require a real image rebuild.
+        - action: rebuild
+          path: ./package.json
+        - action: rebuild
+          path: ./bun.lock
 
   # Nginx proxy gateway
   proxy:
@@ -63,6 +78,17 @@ services:
       - uploads_data:/var/www/uploads:ro
     networks:
       - granada_net
+    develop:
+      watch:
+        # Static files -> sync only, nginx re-reads from disk per request.
+        - action: sync
+          path: ./web
+          target: /var/www/html
+        - action: sync
+          path: ./admin
+          target: /var/www/html/admin
+        - action: rebuild
+          path: ./docker/nginx/default.conf
 
 volumes:
   mongo_data:

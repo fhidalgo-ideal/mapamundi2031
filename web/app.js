@@ -29,6 +29,15 @@ const photoDropZone = document.querySelector("#fileDropZone");
 const photoPreviews = document.querySelector("#filePreviews");
 const photoMessage = document.querySelector("#fileDropMessage");
 const MAX_PHOTOS = 5;
+const citySearchInput = document.querySelector("#citySearchInput");
+const citySearchResults = document.querySelector("#citySearchResults");
+const locationMapEl = document.querySelector("#locationMap");
+const locationSummary = document.querySelector("#locationSummary");
+const locationMessage = document.querySelector("#locationMessage");
+const traceCityHidden = document.querySelector("#traceCityHidden");
+const traceCountryHidden = document.querySelector("#traceCountryHidden");
+const traceLatHidden = document.querySelector("#traceLatHidden");
+const traceLngHidden = document.querySelector("#traceLngHidden");
 
 const INITIAL_CENTER = [20, 0];
 const INITIAL_ZOOM = 2;
@@ -430,10 +439,103 @@ photoInput.addEventListener("change", () => {
   photoInput.addEventListener(eventName, () => photoDropZone.classList.remove("is-dragover"));
 });
 
+// City picker: search Nominatim (proxied through our API) for a place name,
+// then drop a draggable marker on a small map at the exact result the user
+// picked. The marker's position IS what gets submitted as lat/lng, so the
+// point that lands on the public map always matches what the user placed.
+let pickerMap = null;
+let pickerMarker = null;
+
+function setLocationMessage(message) {
+  locationMessage.textContent = message;
+  locationMessage.hidden = !message;
+}
+
+function ensurePickerMap(lat, lng) {
+  if (pickerMap) return;
+  locationMapEl.hidden = false;
+  pickerMap = L.map(locationMapEl, { zoomControl: true }).setView([lat, lng], 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 18,
+  }).addTo(pickerMap);
+  pickerMarker = L.marker([lat, lng], { draggable: true }).addTo(pickerMap);
+  pickerMarker.on("dragend", () => {
+    const { lat: draggedLat, lng: draggedLng } = pickerMarker.getLatLng();
+    traceLatHidden.value = draggedLat;
+    traceLngHidden.value = draggedLng;
+  });
+  // Leaflet needs a sized container; it was `hidden` until now so it never
+  // received a layout pass.
+  requestAnimationFrame(() => pickerMap.invalidateSize());
+}
+
+function selectPlace(place) {
+  citySearchInput.value = `${place.city}, ${place.country}`;
+  citySearchResults.hidden = true;
+  citySearchResults.innerHTML = "";
+  traceCityHidden.value = place.city;
+  traceCountryHidden.value = place.country;
+  traceLatHidden.value = place.lat;
+  traceLngHidden.value = place.lng;
+  setLocationMessage("");
+  locationSummary.hidden = false;
+  locationSummary.textContent = `Ubicacion: ${place.displayName}. Arrastra el marcador para ajustarla.`;
+
+  if (pickerMap) {
+    pickerMap.setView([place.lat, place.lng], 12);
+    pickerMarker.setLatLng([place.lat, place.lng]);
+  } else {
+    ensurePickerMap(place.lat, place.lng);
+  }
+}
+
+let citySearchDebounce = null;
+citySearchInput.addEventListener("input", () => {
+  const query = citySearchInput.value.trim();
+  traceCityHidden.value = "";
+  traceCountryHidden.value = "";
+  traceLatHidden.value = "";
+  traceLngHidden.value = "";
+
+  clearTimeout(citySearchDebounce);
+  if (query.length < 2) {
+    citySearchResults.hidden = true;
+    citySearchResults.innerHTML = "";
+    return;
+  }
+
+  citySearchDebounce = setTimeout(async () => {
+    let payload;
+    try {
+      payload = await apiRequest(`/geocode/search?q=${encodeURIComponent(query)}`);
+    } catch {
+      return;
+    }
+    const results = payload.results ?? [];
+    citySearchResults.innerHTML = "";
+    citySearchResults.hidden = results.length === 0;
+    results.forEach((place) => {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = place.displayName;
+      button.addEventListener("click", () => selectPlace(place));
+      item.appendChild(button);
+      citySearchResults.appendChild(item);
+    });
+  }, 350);
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = new FormData(form);
   const status = document.querySelector("#formStatus");
+
+  if (!traceLatHidden.value || !traceLngHidden.value) {
+    setLocationMessage("Busca tu ciudad y elige un resultado del mapa antes de continuar.");
+    return;
+  }
 
   if (!photoInput.files.length) {
     status.textContent = "Selecciona al menos una fotografia para continuar.";
@@ -449,7 +551,9 @@ form.addEventListener("submit", async (event) => {
     });
     form.reset();
     resetPhotoField();
-    
+    locationSummary.hidden = true;
+    setLocationMessage("");
+
     // Display deletion token to user
     if (response.deletionToken) {
       const tokenMessage = `Recibido. Tu luz esta guardada en el servidor y queda en revision.\n\n⚠️ GUARDA ESTE CODIGO PARA ELIMINAR TU CONTRIBUCION:\n\n${response.deletionToken}\n\nSi lo pierdes, no podras borrar tu aportacion. Cópialo a un lugar seguro.`;
