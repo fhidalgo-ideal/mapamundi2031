@@ -7,6 +7,12 @@ const ROOT_DIR = join(BASE_DIR, "..");
 const UPLOAD_DIR = process.env.GRANADA_UPLOAD_DIR ?? join(ROOT_DIR, "uploads");
 const SEED_PHOTOS_DIR = join(BASE_DIR, "seed-photos");
 
+// Demo traces are inserted whenever the database comes up empty, which is what
+// you want in dev and in the tests but not in production — there a fresh
+// deployment should start with nothing at all. Set GRANADA_SEED=false to skip
+// both the demo rows and their photos.
+const SEED_ENABLED = process.env.GRANADA_SEED !== "false";
+
 // Seed photos ship as fixtures under api/seed-photos/<uuid>.jpg (tracked in git,
 // since uploads/ itself is runtime-only and gitignored) and get copied into the
 // real uploads folder on first seed, so they're served through the exact same
@@ -217,7 +223,7 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
 
     // Seed traces if collection is empty
     const count = await tracesCollection.countDocuments();
-    if (count === 0) {
+    if (count === 0 && SEED_ENABLED) {
       seedUploadPhotos();
       for (const trace of SEED_TRACES) {
         const [lng, lat] = [trace.lng, trace.lat];
@@ -314,7 +320,7 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
       count: number;
     };
 
-    if (count === 0) {
+    if (count === 0 && SEED_ENABLED) {
       seedUploadPhotos();
       const insert = sqliteDb.prepare(`
         INSERT INTO traces (
