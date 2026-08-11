@@ -52,17 +52,79 @@ Existing element IDs that `app.js` depends on are preserved unless a
 section explicitly calls for renaming (in which case `app.js` is
 updated in the same step, never left dangling).
 
+## Page frame & section-card architecture
+
+Pulling `get_design_context` for every top-level frame (not just
+Hero) revealed a structural pattern that applies to the whole page,
+confirmed with the user to replicate exactly:
+
+- The entire page sits inside a fixed **24px cream margin** on all
+  four sides (Figma's "Page frame (border)" node, `--bg-light`
+  colored).
+- Every section from Ticker onward is its own full-width **rounded
+  card** (`border-radius: 24px`) stacked with a consistent **16px
+  gap** between cards, each with its own background color — they are
+  not edge-to-edge sections on a single page background.
+- The Nav is a **floating white pill** (`border-radius: 999px`,
+  `box-shadow: 0 6px 20px rgba(33, 28, 18, 0.08)`), not an
+  edge-to-edge bar — it sits inset the same 24px from the sides, ~20px
+  below the top margin.
+- Section background colors, confirmed via `get_design_context` on
+  each frame (hex values are exact, taken directly from the Figma
+  file):
+  - Hero: `--bg-light` (`#faf6ee`)
+  - Ticker: `#1c1914` (new token `--ticker-bg`)
+  - Pasos: `--bg-light`
+  - Mapa vivo: `#211c13` — this is exactly `--ink-on-light`'s value,
+    reused as a dark section background rather than adding a
+    duplicate token
+  - Mapa vivo's inner map panel: `#12181f` (new token
+    `--map-panel-bg`)
+  - Cita (quote): `#f2954a` — a bright tangerine distinct from
+    `--coral`, new token `--accent-bright`. This is **not** a dark
+    banner as the current `.dark-pullquote-banner` name implies —
+    the background changes to `--accent-bright`.
+  - Stats overlay card: `#221d15` (near-black, new token
+    `--stats-overlay-bg`), **not white** — its big number is colored
+    `--accent-bright`.
+  - Galería: `--bg-light`
+  - Newsletter: `#5c78b4` — exactly `--blue`, reused directly
+  - Footer credits: `#14151c` (new token `--footer-bg`)
+- New chip/eyebrow background colors observed: most eyebrow chips use
+  `--ink-on-light` (`#211c13`) as a dark pill with white text (Pasos,
+  Galería), but Mapa vivo's chip uses `--accent-bright`
+  (`#f2954a`) and Cita's chip uses `--coral` (`#c1622d`) — the chip
+  is not a single fixed style, it's a shared shape (pill, ~11-12px
+  uppercase text, wide tracking) with a per-section background/text
+  color pair.
+- The stats overlay card (`74:2`) straddles the seam between the
+  Mapa vivo card and the Cita card in Figma's Y coordinates (it
+  starts before Mapa vivo ends and ends after Cita begins) — it's
+  positioned to visually float across the boundary between the two,
+  not fully inside either. Implementation: wrap the Mapa vivo and
+  Cita cards in a shared `position: relative` container and
+  absolutely position the stats card centered on that boundary.
+- The Nav's fixed/sticky-on-scroll behavior is not something Figma's
+  static frame encodes one way or the other — keeping it sticky at
+  the top while scrolling (as the current `.topbar` already does) is
+  a reasonable carry-over from existing UX, not a deviation from the
+  approved design.
+
 ## Section-by-section design
 
 ### 1. Nav
 
-Currently a fixed, blurred dark-glass topbar (`.topbar`) with a single
-"Mapa" link. Figma shows a plain light nav on `--bg-light` with a
-thin bottom border, three links (Mapa / Participa / Archivo), and a
-pill CTA "Subir una foto".
+Currently a fixed, blurred dark-glass topbar (`.topbar`) spanning the
+full viewport width, with a single "Mapa" link. Figma shows a white
+floating pill (see Page frame section above), inset from the sides,
+with three links (Mapa / Participa / Archivo) and a coral pill CTA
+"Subir una foto".
 
-- Restyle `.topbar` to the light palette (background `--bg-light` at
-  high opacity, `--line-light` border).
+- Restyle `.topbar` into the floating pill: white background,
+  `border-radius: 999px`, `box-shadow: 0 6px 20px rgba(33, 28, 18,
+  0.08)`, inset by the page's 24px margin, staying sticky/fixed at
+  the top on scroll (existing behavior, not a Figma-specified detail
+  — see Page frame section).
 - Add two nav links: "Participa" (anchors to the Pasos section) and
   "Archivo" (anchors to the Galería section, `#archivo` already
   exists as the section's id).
@@ -97,7 +159,8 @@ matching Figma's `18:5`/`72:52`/`18:8`/`72:56` nodes.
 
 ### 3. Ticker
 
-New, purely decorative section — doesn't exist today. An infinite
+New, purely decorative section — doesn't exist today. A dark
+(`--ticker-bg`, `#1c1914`) rounded card containing an infinite
 horizontal marquee of repeating text ("GRANADA 2031 · CANDIDATURA
 CULTURAL · ... · TESTIMONIOS GLOBALES ·"), implemented with a CSS
 `@keyframes` translateX loop over a duplicated content list for a
@@ -110,26 +173,33 @@ under `prefers-reduced-motion: reduce`.
 Existing `.how-to-contribute` section with 3 real `.step-card`s stays
 structurally the same. Visual changes only:
 
-- `.eyebrow` becomes a pill/chip (background + border + rounded),
-  replacing today's plain colored text — this chip styling is shared
-  by every section eyebrow (Pasos, Mapa vivo, Galería, Cita), so it's
-  a single CSS change reused everywhere.
-- Each step card gets a large outlined numeral (01/02/03) behind the
-  title, per Figma's `73:150`/`73:152`/`73:154` nodes.
+- `.eyebrow` becomes a pill/chip: dark background (`--ink-on-light`),
+  white uppercase text, wide letter-spacing — this base chip shape is
+  shared by every section eyebrow, with each section supplying its
+  own background/text color pair (see Page frame section for the
+  per-section colors).
+- Each step card gets a large numeral (01/02/03) above the title,
+  90px, medium weight, colored `rgba(193, 98, 45, 0.7)` (a
+  translucent `--coral`, not a stroked/outlined glyph — just a
+  low-opacity fill), per Figma's `73:150`/`73:152`/`73:154` nodes.
 
 ### 5. Mapa vivo
 
 No functional change — same Leaflet map, same filter chips, same
-zoom controls, same IDs. Only the containing panel and heading get
-restyled (chip eyebrow, left-aligned heading, corner radius/spacing)
-to sit visually consistent with the rest of the page.
+zoom controls, same IDs. The section wrapper becomes a dark rounded
+card (`--ink-on-light` background, white heading text, `--accent-bright`
+chip), with the map widget itself sitting in an inner panel colored
+`--map-panel-bg` (`#12181f`).
 
 ### 6. Cita + stats overlay
 
-Keep `.dark-pullquote-banner` (chip "LA COMUNIDAD" + centered quote)
-as-is functionally. Add the white stats card that overlaps the top of
-this section in Figma (node `74:2`), using a negative margin-top to
-create the overlap. Populated with real data:
+`.dark-pullquote-banner` is renamed in spirit but keeps its role
+(chip + centered quote) — its background becomes `--accent-bright`
+(`#f2954a`), not dark, with a `--coral` chip "LA COMUNIDAD". Add the
+stats card that straddles the seam between the Mapa vivo card and
+this one (node `74:2`, see Page frame section for the overlap
+mechanics): background `--stats-overlay-bg` (`#221d15`), big central
+number colored `--accent-bright`. Populated with real data:
 
 - Big central number: total approved count (same value as
   `#statPhotos`).
@@ -158,20 +228,23 @@ reused as-is.
 
 ### 8. Newsletter
 
-Existing `#newsletterForm` stays functionally identical. The submit
-button changes from a text pill ("Avisadme") to a small circular
-arrow ("→") button sitting inside the rounded input group, per
-Figma's `5:58` node. Accessible label preserved via `aria-label`.
+Existing `#newsletterForm` stays functionally identical. The section
+background becomes `--blue` (`#5c78b4`, exact match), heading text
+white with a subtle text-shadow. The submit button changes from a
+text pill ("Avisadme") to a small circular `--coral` arrow ("→")
+button sitting inside the rounded cream input group, per Figma's
+`5:58` node. Accessible label preserved via `aria-label`.
 
 ### 9. Footer
 
 Existing `.site-footer` is minimal (one line of text + 2 legal links
-+ IDEAL logo). Figma's footer is richer: project description
-paragraph, contact email, tagline, and a two-column layout. Expand
-`.footer-inner` to match, while keeping `#footerText`,
-`#privacyLink`, `#legalLink`, `#idealLogoLink`, `#idealLogo`,
-`#idealLogoFallback` untouched since `applyPublicConfig()` writes to
-them.
++ IDEAL logo). Figma's footer is richer: a dark (`--footer-bg`,
+`#14151c`) rounded card with a project description paragraph,
+contact email, tagline, and a two-column layout (text block left,
+IDEAL logo right). Expand `.footer-inner` to match, while keeping
+`#footerText`, `#privacyLink`, `#legalLink`, `#idealLogoLink`,
+`#idealLogo`, `#idealLogoFallback` untouched since
+`applyPublicConfig()` writes to them.
 
 The contact email shown in Figma (`info@2031granadaideal.es`) has no
 corresponding field in the public config today. Confirmed with the
