@@ -174,10 +174,8 @@ paragraph, contact email, tagline, and a two-column layout. Expand
 them.
 
 The contact email shown in Figma (`info@2031granadaideal.es`) has no
-corresponding field in the public config today, so it's added as
-static text in the footer markup. If there's a real address to use
-instead, or if it should be omitted, that's a follow-up — flagged
-here rather than silently guessed.
+corresponding field in the public config today. Confirmed with the
+user: use that same address as static text in the footer markup.
 
 ## Testing / verification
 
