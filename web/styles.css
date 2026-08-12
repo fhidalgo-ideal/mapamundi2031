@@ -19,6 +19,14 @@
   --green: #9ccf6b;
   --violet: #b896ff;
   --danger: #e45252;
+  --ticker-bg: #1c1914;
+  --map-panel-bg: #12181f;
+  --accent-bright: #f2954a;
+  --stats-overlay-bg: #221d15;
+  --footer-bg: #14151c;
+  --page-margin: 24px;
+  --card-radius: 24px;
+  --card-gap: 16px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -56,6 +64,30 @@ textarea {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+.page-frame {
+  background: var(--bg-light);
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+  padding: var(--page-margin);
+}
+
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.map-cita-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.card {
+  border-radius: var(--card-radius);
 }
 
 .topbar {
