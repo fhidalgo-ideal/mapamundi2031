@@ -337,11 +337,15 @@ nav a:hover {
 }
 
 .eyebrow {
-  color: var(--coral);
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  background: var(--ink-on-light);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-block;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide);
   margin: 0 0 14px;
+  padding: 6px 16px;
   text-transform: uppercase;
 }
 
@@ -619,13 +623,12 @@ h1 {
 }
 
 .step-number {
-  color: var(--coral);
-  font-size: clamp(48px, 8vw, 120px);
-  font-weight: 200;
+  color: rgba(193, 98, 45, 0.7);
+  font-size: clamp(48px, 8vw, 90px);
+  font-weight: var(--fw-semibold);
   letter-spacing: -0.02em;
   line-height: 0.9;
   margin-bottom: 16px;
-  opacity: 0.35;
 }
 
 .step-card h3 {
