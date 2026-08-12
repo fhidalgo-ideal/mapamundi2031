@@ -425,12 +425,28 @@ h1 {
   color: #ffd5d5;
 }
 
-.map-section,
 .submit-section,
 .archive-section,
 .admin-section,
 .how-to-contribute {
   padding: 64px clamp(18px, 4vw, 56px);
+}
+
+.map-section {
+  background: var(--ink-on-light);
+  color: var(--ink-on-dark);
+  padding: 64px clamp(18px, 4vw, 56px);
+  position: relative;
+}
+
+.map-section h2,
+.map-section .section-heading {
+  color: var(--ink-on-dark);
+}
+
+.map-section .eyebrow {
+  background: var(--accent-bright);
+  color: var(--ink-on-light);
 }
 
 .dark-pullquote-banner {
@@ -687,7 +703,7 @@ h2 {
 }
 
 .map-shell {
-  background: var(--bg-dark);
+  background: var(--map-panel-bg);
   border: 1px solid var(--line);
   border-radius: 28px;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.4), 0 0 120px rgba(247, 198, 103, 0.08);
