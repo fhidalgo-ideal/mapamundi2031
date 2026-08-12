@@ -13,7 +13,7 @@
 - Preserve every existing element ID that `web/app.js` queries by selector, unless a task explicitly renames it and updates `app.js` in the same step (never leave a dangling selector).
 - No backend/API changes.
 - No pixel-perfect cloning of Figma's placeholder content (city names, testimonial quotes, stat numbers) — those stay wired to real API data; Figma is the layout/style reference only.
-- Dark-panel tokens `--bg-dark`, `--surface`, `--surface-2`, `--ink-on-dark`, `--line`, `--muted` stay untouched (used by map controls / story panel / modal chrome, unrelated to this redesign).
+- Dark-panel tokens `--surface`, `--surface-2`, `--ink-on-dark`, `--line`, `--muted` stay untouched (used by map controls / story panel / modal chrome, unrelated to this redesign). `--bg-dark` was also expected to stay untouched, but Tasks 5/6/8 recolored all three of its consumers (`.map-shell`, `.dark-pullquote-banner`, `.newsletter-banner`) away from it, so as implemented it's an unused token with no `var(--bg-dark)` references left in `web/styles.css`.
 - New CSS custom properties introduced by this plan (all added in Task 0): `--ticker-bg` (`#1c1914`), `--map-panel-bg` (`#12181f`), `--accent-bright` (`#f2954a`), `--stats-overlay-bg` (`#221d15`), `--footer-bg` (`#14151c`), `--page-margin` (`24px`), `--card-radius` (`24px`), `--card-gap` (`16px`).
 - After each task, load `http://localhost/` (dev stack via `docker compose watch`) and compare against the Figma screenshot for that section before starting the next task.
 

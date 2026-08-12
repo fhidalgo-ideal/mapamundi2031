@@ -57,6 +57,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 104px;
 }
 
 html,
@@ -522,7 +523,7 @@ h1 {
   flex-direction: column;
   justify-content: center;
   margin: 0;
-  padding: 96px clamp(18px, 4vw, 56px);
+  padding: 140px clamp(18px, 4vw, 56px) 96px;
   text-align: center;
 }
 
@@ -610,18 +611,18 @@ h1 {
 }
 
 .newsletter-status {
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.85);
   font-size: 14px;
   margin: 16px 0 0;
   min-height: 20px;
 }
 
 .newsletter-status.error {
-  color: var(--coral);
+  color: #ffd9d2;
 }
 
 .newsletter-status.success {
-  color: var(--green);
+  color: #e6ffd6;
 }
 
 @media (max-width: 520px) {
@@ -804,6 +805,7 @@ h2 {
   border-radius: 16px;
   overflow: hidden;
   position: relative;
+  z-index: 0;
 }
 
 #worldMap {
@@ -1694,6 +1696,10 @@ textarea {
 }
 
 @media (max-width: 900px) {
+  html {
+    scroll-padding-top: 160px;
+  }
+
   .topbar {
     align-items: flex-start;
     border-radius: 24px;
@@ -1906,10 +1912,6 @@ body.modal-open {
 }
 
 @media (max-width: 760px) {
-  .polaroid {
-    display: none;
-  }
-
   .hero {
     min-height: auto;
   }
