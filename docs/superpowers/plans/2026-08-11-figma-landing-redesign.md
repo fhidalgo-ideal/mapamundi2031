@@ -28,11 +28,42 @@
 **Interfaces:**
 - Produces: CSS custom properties listed in Global Constraints above; CSS classes `.page-frame`, `.page-stack`, `.map-cita-wrap`, `.card` (all later tasks apply `.card` to their section and rely on `.page-frame`'s cream background showing through the 16px gaps).
 
-- [ ] **Step 1: Add new design tokens to `:root`**
+- [ ] **Step 1: Replace `:root` with the full corrected token set**
 
-In `web/styles.css`, insert after the `--gradient-wordmark` line (currently line 23) and before the blank line at line 24:
+A prior session's Figma-hero color/type token pass (`--bg-light`, `--ink-on-light`,
+`--muted-on-light`, `--line-light`, `--coral`, `--blue`, `--gradient-wordmark`, and
+the `--fs-*`/`--fw-*`/`--lh-*`/`--ls-*` type-scale tokens) was made only as an
+uncommitted edit in the original checkout and was never committed — this worktree
+branched from committed history, so it does not have them. Every later task in this
+plan (Hero, Pasos, Cita, Newsletter, Footer) references these tokens by name as if
+they already exist, so this step restores them alongside the new page-frame tokens.
+
+Replace the entire `:root` block at the top of `web/styles.css` with:
 
 ```css
+:root {
+  color-scheme: light;
+  --bg: #0b1020;
+  --bg-light: #faf6ee;
+  --bg-dark: #0b1020;
+  --surface: #121a2b;
+  --surface-2: #172136;
+  --ink: #f6f1e8;
+  --ink-on-light: #211c13;
+  --ink-on-dark: #f6f1e8;
+  --muted: #aeb8c7;
+  --muted-on-light: rgba(33, 28, 19, 0.62);
+  --line: rgba(255, 255, 255, 0.14);
+  --line-light: rgba(33, 28, 19, 0.12);
+  --gold: #f7c667;
+  --coral: #c1622d;
+  --blue: #5c78b4;
+  --sage: #7c8a5a;
+  --aqua: #67d7c4;
+  --green: #9ccf6b;
+  --violet: #b896ff;
+  --danger: #e45252;
+  --gradient-wordmark: linear-gradient(90deg, var(--blue), var(--coral));
   --ticker-bg: #1c1914;
   --map-panel-bg: #12181f;
   --accent-bright: #f2954a;
@@ -41,7 +72,34 @@ In `web/styles.css`, insert after the `--gradient-wordmark` line (currently line
   --page-margin: 24px;
   --card-radius: 24px;
   --card-gap: 16px;
+
+  --font-family-base: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --fw-regular: 400;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+  --fs-display: 168px;
+  --fs-h1: 96px;
+  --fs-body-lg: 18px;
+  --fs-button: 15px;
+  --fs-stat: 28px;
+  --fs-label: 12px;
+  --fs-caption: 11px;
+  --lh-tight: 0.95;
+  --lh-none: 1;
+  --lh-normal: 1.4;
+  --ls-wide: 5.04px;
+  --ls-tight: -0.96px;
+
+  font-family: var(--font-family-base);
+}
 ```
+
+Note this also changes some existing values the worktree currently has (e.g.
+`--coral` from `#f26d5b` to `#c1622d`, `--bg-light` from `#f7f4ee` to `#faf6ee`,
+`--ink-on-light` from `#1a1a1a` to `#211c13`) — these are the corrected Figma-derived
+values, not a regression; every existing rule that references these tokens via
+`var(...)` picks up the new values automatically.
 
 - [ ] **Step 2: Add page-frame/card-stack CSS rules**
 
