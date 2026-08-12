@@ -1641,7 +1641,7 @@ textarea {
   max-width: 640px;
 }
 
-.footer-description {
+.footer-main .footer-description {
   color: var(--ink);
   font-size: var(--fs-body-lg);
   line-height: var(--lh-normal);
@@ -1653,7 +1653,7 @@ textarea {
   margin: 0;
 }
 
-.footer-contact {
+.footer-main .footer-contact {
   color: var(--ink);
   font-weight: var(--fw-semibold);
 }
