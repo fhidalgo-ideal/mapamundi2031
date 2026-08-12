@@ -702,8 +702,6 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 32px;
-  margin: 0 auto;
-  max-width: 1280px;
 }
 
 .step-card {
@@ -747,7 +745,10 @@ h1 {
   }
 }
 
-.section-heading,
+.section-heading {
+  margin: 0 0 22px;
+}
+
 .admin-layout {
   margin: 0 auto 22px;
   max-width: 1280px;
@@ -780,8 +781,6 @@ h2 {
   border-radius: 28px;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.4), 0 0 120px rgba(247, 198, 103, 0.08);
   color: var(--ink-on-dark);
-  margin: 0 auto;
-  max-width: 1280px;
   padding: clamp(18px, 3vw, 32px);
 }
 
@@ -1241,8 +1240,6 @@ textarea {
   display: grid;
   gap: 22px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 0 auto;
-  max-width: 1280px;
 }
 
 .review-item,
@@ -1334,8 +1331,7 @@ textarea {
 .archive-actions {
   display: flex;
   justify-content: center;
-  margin: 32px auto 0;
-  max-width: 1280px;
+  margin: 32px 0 0;
 }
 
 .button.outline {
@@ -1633,8 +1629,6 @@ textarea {
   display: flex;
   gap: 18px;
   justify-content: space-between;
-  margin: 0 auto;
-  max-width: 1280px;
 }
 
 .footer-main {
