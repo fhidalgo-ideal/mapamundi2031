@@ -111,6 +111,44 @@ a {
   border-radius: var(--card-radius);
 }
 
+.ticker {
+  background: var(--ticker-bg);
+  overflow: hidden;
+  padding: 20px 0;
+}
+
+.ticker-track {
+  animation: ticker-scroll 24s linear infinite;
+  display: flex;
+  width: max-content;
+}
+
+.ticker-item {
+  color: var(--ink);
+  flex-shrink: 0;
+  font-size: var(--fs-body-lg);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide);
+  padding-right: 24px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+}
+
 .topbar {
   align-items: center;
   background: #ffffff;
