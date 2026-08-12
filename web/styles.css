@@ -537,7 +537,7 @@ h1 {
 }
 
 .newsletter-banner {
-  background: var(--bg-dark);
+  background: var(--blue);
   padding: 72px clamp(18px, 4vw, 56px);
   display: flex;
   justify-content: center;
@@ -550,13 +550,14 @@ h1 {
 }
 
 .newsletter-title {
-  color: var(--ink-on-dark);
+  color: #fff;
   font-size: clamp(24px, 4vw, 40px);
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
   margin: 0 0 32px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  text-transform: uppercase;
 }
 
 .newsletter-form {
@@ -565,9 +566,9 @@ h1 {
 
 .newsletter-control {
   align-items: center;
-  background: #fff;
+  background: var(--bg-light);
   border-radius: 999px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   display: flex;
   margin: 0 auto;
   max-width: 480px;
@@ -590,16 +591,18 @@ h1 {
 }
 
 .newsletter-submit {
+  align-items: center;
   background: var(--coral);
   border: 0;
-  border-radius: 999px;
-  color: var(--bg-light);
+  border-radius: 50%;
+  color: #fff;
   cursor: pointer;
-  font-size: 15px;
-  font-weight: 600;
-  min-height: 44px;
-  padding: 0 24px;
-  white-space: nowrap;
+  display: flex;
+  flex-shrink: 0;
+  font-size: 18px;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
 }
 
 .newsletter-submit:hover {
@@ -630,7 +633,8 @@ h1 {
   }
 
   .newsletter-submit {
-    width: 100%;
+    align-self: center;
+    width: 44px;
   }
 }
 
