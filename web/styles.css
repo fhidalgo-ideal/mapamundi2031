@@ -1252,7 +1252,7 @@ textarea {
   border: 1px solid var(--line-light);
   border-radius: 4px;
   box-shadow: 0 14px 32px rgba(26, 26, 26, 0.16);
-  padding: 12px 12px 16px;
+  padding: 16px 16px 20px;
   transform: rotate(var(--tilt, 0deg));
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -1265,14 +1265,14 @@ textarea {
 }
 
 .trace-card img {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 5;
   border-radius: 2px;
   object-fit: cover;
   width: 100%;
 }
 
 .trace-card div {
-  padding: 12px 4px 0;
+  padding: 14px 2px 0;
 }
 
 .trace-card h3 {
