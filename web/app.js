@@ -278,6 +278,9 @@ function renderStats() {
   setStat("#statPhotos", approved.length);
   setStat("#statCountries", countries);
   setStat("#statCities", cities);
+  setStat("#overlayStatTotal", approved.length);
+  setStat("#overlayStatCountries", countries);
+  setStat("#overlayStatCities", cities);
 }
 
 const HERO_POLAROID_FALLBACKS = [
