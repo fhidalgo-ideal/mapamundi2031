@@ -1622,13 +1622,12 @@ textarea {
 }
 
 .site-footer {
-  border-top: 1px solid var(--line);
-  background: #080d18;
-  padding: 24px clamp(18px, 4vw, 56px);
+  background: var(--footer-bg);
+  padding: 56px clamp(18px, 4vw, 56px);
 }
 
 .footer-inner {
-  align-items: center;
+  align-items: flex-end;
   display: flex;
   gap: 18px;
   justify-content: space-between;
@@ -1636,9 +1635,27 @@ textarea {
   max-width: 1280px;
 }
 
+.footer-main {
+  display: grid;
+  gap: 12px;
+  max-width: 640px;
+}
+
+.footer-description {
+  color: var(--ink);
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-normal);
+  margin: 0;
+}
+
 .footer-inner p {
   color: var(--muted);
   margin: 0;
+}
+
+.footer-contact {
+  color: var(--ink);
+  font-weight: var(--fw-semibold);
 }
 
 .footer-links {
