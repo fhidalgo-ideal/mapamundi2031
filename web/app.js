@@ -51,7 +51,7 @@ const map = L.map(worldMapEl, {
   worldCopyJump: true,
 });
 
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3lqo_1_f3d0e131275a6b32a53e7a11", {
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
   attribution:
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
   subdomains: "abcd",
@@ -460,7 +460,7 @@ function ensurePickerMap(lat, lng) {
   if (pickerMap) return;
   locationMapEl.hidden = false;
   pickerMap = L.map(locationMapEl, { zoomControl: true }).setView([lat, lng], 12);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3lqo_1_f3d0e131275a6b32a53e7a11", {
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
     subdomains: "abcd",
     maxZoom: 20,
