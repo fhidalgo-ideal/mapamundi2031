@@ -32,6 +32,7 @@
 
   --font-family-base: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --fw-regular: 400;
+  --fw-medium: 500;
   --fw-semibold: 600;
   --fw-bold: 700;
   --fw-extrabold: 800;
@@ -219,16 +220,16 @@ a {
 .topbar {
   align-items: center;
   background: #ffffff;
+  border-radius: 999px;
   box-shadow: 0 6px 20px rgba(33, 28, 18, 0.08);
   display: flex;
   justify-content: space-between;
-  left: 0;
-  right: 0;
-  margin: 0;
-  min-height: 64px;
-  padding: 10px var(--page-margin);
+  left: var(--page-margin);
+  right: var(--page-margin);
+  margin: 0 auto;
+  padding: 20px 20px 20px 32px;
   position: fixed;
-  top: 0;
+  top: 20px;
   /* Above the map's own stacked UI (.map-controls/.map-hint at 1000) so it
      can't peek over the fixed header's edge during scroll; below the
      modal/story-panel overlays (2000), which must sit above everything. */
@@ -279,8 +280,9 @@ nav {
 }
 
 nav a {
-  color: var(--muted-on-light);
+  color: rgba(33, 28, 19, 0.75);
   font-size: 14px;
+  font-weight: var(--fw-medium);
 }
 
 nav a:hover {
@@ -293,7 +295,7 @@ nav a:hover {
   display: flex;
   justify-content: center;
   min-height: 92vh;
-  padding: 120px clamp(22px, 6vw, 86px) 80px;
+  padding: 140px clamp(22px, 6vw, 86px) 80px;
   position: relative;
 }
 
@@ -464,9 +466,11 @@ h1 {
 }
 
 .nav-cta {
-  background: var(--coral);
+  background: #e10600;
   border-radius: 999px;
   color: var(--bg-light);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
   min-height: 40px;
   padding: 0 20px;
 }
@@ -638,13 +642,13 @@ h1 {
 }
 
 .admin-page {
-  padding-top: 72px;
+  padding-top: 92px;
 }
 
 .legal-page {
   margin: 0 auto;
   max-width: 900px;
-  padding: 72px clamp(18px, 4vw, 56px) 64px;
+  padding: 92px clamp(18px, 4vw, 56px) 64px;
 }
 
 .legal-page h1 {
