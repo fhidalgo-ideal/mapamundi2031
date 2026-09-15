@@ -1765,6 +1765,13 @@ textarea {
     position: static;
   }
 
+  .how-to-contribute .eyebrow {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: fit-content;
+  }
+
   .nav-toggle {
     display: flex;
   }
