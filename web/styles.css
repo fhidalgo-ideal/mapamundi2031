@@ -439,7 +439,7 @@ nav a:hover {
   font-size: var(--fs-label);
   font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wide);
-  margin: 0 0 14px;
+  margin: 0 0 22px;
   padding: 6px 16px;
   text-transform: uppercase;
 }
