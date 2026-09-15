@@ -301,6 +301,7 @@ nav a:hover {
 }
 
 .hero-inner {
+  --side-figure-w: clamp(148px, 15vw, 208px);
   align-items: center;
   display: flex;
   flex-direction: column;
@@ -327,18 +328,20 @@ nav a:hover {
   box-shadow: 0 18px 40px rgba(26, 26, 26, 0.1);
   height: clamp(180px, 20vw, 250px);
   position: absolute;
-  width: clamp(148px, 15vw, 208px);
+  width: var(--side-figure-w);
   z-index: 0;
 }
 
+/* Sits further out than the polaroid it peeks from behind, so the stacked
+   look holds at every width instead of the two boxes converging together. */
 .hero-decor-left {
-  left: -6vw;
+  left: calc(-1 * (var(--side-figure-w) + 64px));
   top: 14%;
   transform: rotate(-10deg);
 }
 
 .hero-decor-right {
-  right: -6vw;
+  right: calc(-1 * (var(--side-figure-w) + 64px));
   top: 14%;
   transform: rotate(10deg);
 }
@@ -351,7 +354,7 @@ nav a:hover {
   margin: 0;
   padding: 12px 12px 14px;
   position: absolute;
-  width: clamp(148px, 15vw, 208px);
+  width: var(--side-figure-w);
   z-index: 1;
 }
 
@@ -372,14 +375,18 @@ nav a:hover {
   text-align: center;
 }
 
+/* Offset by the figure's own (fluid) width plus a fixed gap, so the
+   polaroid's inner edge always clears .hero-inner (and, inside it,
+   .hero-copy's 40px-narrower column) instead of drifting into the text
+   at viewport widths where a plain vw offset wasn't enough clearance. */
 .polaroid-left {
-  left: -2vw;
+  left: calc(-1 * (var(--side-figure-w) + 24px));
   top: 4%;
   transform: rotate(-6deg);
 }
 
 .polaroid-right {
-  right: -2vw;
+  right: calc(-1 * (var(--side-figure-w) + 24px));
   top: 4%;
   transform: rotate(6deg);
 }
