@@ -281,7 +281,8 @@ nav {
 
 nav a {
   color: rgba(33, 28, 19, 0.75);
-  font-size: 14px;
+  font-family: var(--font-family-base);
+  font-size: 15px;
   font-weight: var(--fw-medium);
 }
 
@@ -469,7 +470,8 @@ h1 {
   background: #e10600;
   border-radius: 999px;
   color: var(--bg-light);
-  font-size: 14px;
+  font-family: var(--font-family-base);
+  font-size: 15px;
   font-weight: var(--fw-semibold);
   min-height: 40px;
   padding: 0 20px;
