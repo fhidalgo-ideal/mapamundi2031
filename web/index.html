@@ -8,10 +8,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260915-5">
+    <link rel="stylesheet" href="styles.css?v=20260915-6">
   </head>
   <body>
-    <header class="topbar">
+    <header class="topbar" id="topbar">
       <a class="brand" id="brandLink" href="#mapa" aria-label="Granada 2031">
         <span class="brand-mark" id="brandMark"></span>
         <img class="brand-logo hidden" id="brandLogo" alt="">
@@ -20,7 +20,12 @@
           <small id="brandSubtitle">Geolocalizacion del Sentimiento</small>
         </span>
       </a>
-      <div class="topbar-nav">
+      <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="topbarNav">
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+      <div class="topbar-nav" id="topbarNav">
         <nav aria-label="Navegacion principal">
           <a href="#mapa">Mapa</a>
           <a href="#como-participar">Participa</a>
@@ -337,6 +342,6 @@
     </template>
 
     <script src="vendor/leaflet/leaflet.js"></script>
-    <script src="app.js?v=20260915-1"></script>
+    <script src="app.js?v=20260915-2"></script>
   </body>
 </html>

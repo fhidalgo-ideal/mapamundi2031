@@ -635,7 +635,33 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeStory();
     closeContributeModal();
+    closeMobileNav();
   }
+});
+
+// Mobile hamburger menu: collapses the nav links + CTA into a toggleable
+// panel below the logo/toggle row (see the 900px CSS query) so the header
+// stays a single line instead of stacking every element.
+const topbarEl = document.querySelector("#topbar");
+const navToggle = document.querySelector("#navToggle");
+
+function closeMobileNav() {
+  if (!topbarEl?.classList.contains("nav-open")) return;
+  topbarEl.classList.remove("nav-open");
+  navToggle?.setAttribute("aria-expanded", "false");
+  navToggle?.setAttribute("aria-label", "Abrir menu");
+}
+
+navToggle?.addEventListener("click", () => {
+  const isOpen = topbarEl.classList.toggle("nav-open");
+  navToggle.setAttribute("aria-expanded", String(isOpen));
+  navToggle.setAttribute("aria-label", isOpen ? "Cerrar menu" : "Abrir menu");
+});
+
+// Picking a link or the CTA closes the panel instead of leaving it open
+// over the section it just jumped/scrolled to.
+document.querySelector("#topbarNav")?.addEventListener("click", (event) => {
+  if (event.target.closest("a, button")) closeMobileNav();
 });
 
 document.querySelector("#heroViewMap")?.addEventListener("click", () => {

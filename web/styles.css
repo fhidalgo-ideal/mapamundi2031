@@ -282,6 +282,28 @@ a {
   gap: clamp(14px, 2vw, 28px);
 }
 
+/* Hidden on desktop; the mobile query below turns it into the hamburger
+   toggle for .topbar-nav. */
+.nav-toggle {
+  align-items: center;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+  padding: 8px;
+}
+
+.nav-toggle-bar {
+  background: var(--ink-on-light);
+  border-radius: 2px;
+  height: 2px;
+  width: 22px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
 nav {
   display: flex;
   gap: clamp(12px, 2vw, 28px);
@@ -1729,29 +1751,64 @@ textarea {
     --page-margin: 12px;
   }
 
-  /* Scrolls away with the page instead of floating fixed over content. */
+  /* Scrolls away with the page instead of floating fixed over content, and
+     stays a single row (logo + hamburger toggle) — the links/CTA that used
+     to sit alongside them move into the collapsible panel below instead. */
   .topbar {
-    align-items: flex-start;
+    align-items: center;
     border-radius: 24px;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 12px;
+    justify-content: space-between;
     margin: 12px 12px 0;
     position: static;
   }
 
+  .nav-toggle {
+    display: flex;
+  }
+
+  /* Collapsed by default; .topbar.nav-open reveals it as a full-width panel
+     that wraps onto its own line below the logo/toggle row. */
   .topbar-nav {
-    justify-content: space-between;
+    align-items: stretch;
+    display: none;
+    flex-basis: 100%;
+    flex-direction: column;
+    gap: 16px;
     width: 100%;
   }
 
+  .topbar.nav-open .topbar-nav {
+    display: flex;
+  }
+
   nav {
-    flex: 1;
-    overflow-x: auto;
-    padding-bottom: 4px;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  nav a {
+    display: block;
+    padding: 8px 0;
   }
 
   .nav-cta {
-    flex-shrink: 0;
+    width: 100%;
+  }
+
+  /* Hamburger -> X, driven by the same .nav-open state as the panel above. */
+  .topbar.nav-open .nav-toggle-bar:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+  }
+
+  .topbar.nav-open .nav-toggle-bar:nth-child(2) {
+    opacity: 0;
+  }
+
+  .topbar.nav-open .nav-toggle-bar:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
   }
 
   /* These three top paddings were only ever tuned for clearance under the
@@ -1831,7 +1888,7 @@ textarea {
        The header is static/in-flow on mobile now (see the 900px query),
        so this only needs to be plain breathing room like the 900px rule's
        32px — not re-inflated back up at this narrower breakpoint. */
-    padding-top: 20px;
+    padding-top: 32px;
   }
 
   h1 {
