@@ -211,10 +211,15 @@ a {
 }
 
 @media (max-width: 760px) {
+  /* Desktop straddles this card over the map card's bottom edge (position:
+     absolute + a 50% transform). That doesn't translate to the stacked
+     mobile layout: back in normal flow, a negative top margin here pulls it
+     up into .map-shell itself instead of just "peeking" over an edge,
+     covering the bottom of the map. Give it normal positive spacing instead. */
   .stats-overlay-card {
     bottom: auto;
     left: auto;
-    margin: -40px auto 0;
+    margin: 20px auto 0;
     position: relative;
     transform: none;
   }
