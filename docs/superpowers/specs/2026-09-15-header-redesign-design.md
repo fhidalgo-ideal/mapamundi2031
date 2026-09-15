@@ -43,6 +43,17 @@ Make `.topbar` (`web/index.html`'s header) match `Landing/header.png`:
 full width, the real logo image, and a correctly pill-shaped CTA
 button — without touching any other section of the page.
 
+`.topbar`/`.brand` is a shared component reused verbatim in
+`admin/admin.html`, `web/aviso-legal.html`, and
+`web/politica-de-privacidad.html`. The full-width bar and CTA pill fix
+are CSS-only changes to that shared class, so **they apply to all four
+pages** (confirmed with the user) — this is not landing-only. The logo
+swap, by contrast, is naturally landing-only: only `web/index.html` +
+`web/app.js` wire up `#brandLogo`/`#brandMark`/`applyLogo()`; admin and
+the legal pages have a static, unwired `<span class="brand-mark">`
+with no JS hook, so they keep showing the plain coral circle regardless
+of `config.json`'s `brand_logo`.
+
 ## Non-goals
 
 - No change to the floating-card treatment of any other section
