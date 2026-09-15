@@ -138,9 +138,10 @@ function setLink(selector, label, url) {
   if (url) element.href = url;
 }
 
-function applyLogo(imageSelector, fallbackSelector, src, alt) {
+function applyLogo(imageSelector, fallbackSelector, src, alt, extraHideSelector) {
   const image = document.querySelector(imageSelector);
   const fallback = document.querySelector(fallbackSelector);
+  const extra = extraHideSelector ? document.querySelector(extraHideSelector) : null;
   if (!image) return;
 
   if (src) {
@@ -148,12 +149,14 @@ function applyLogo(imageSelector, fallbackSelector, src, alt) {
     image.alt = alt || "";
     image.classList.remove("hidden");
     if (fallback) fallback.classList.add("hidden");
+    if (extra) extra.classList.add("hidden");
     return;
   }
 
   image.removeAttribute("src");
   image.classList.add("hidden");
   if (fallback) fallback.classList.remove("hidden");
+  if (extra) extra.classList.remove("hidden");
 }
 
 function applyPublicConfig(config) {
@@ -175,7 +178,7 @@ function applyPublicConfig(config) {
   setLink("#privacyLink", config.privacy_label, config.privacy_url);
   setLink("#legalLink", config.legal_label, config.legal_url);
   setLink("#idealLogoLink", null, config.ideal_url);
-  applyLogo("#brandLogo", "#brandMark", config.brand_logo, config.brand_logo_alt);
+  applyLogo("#brandLogo", "#brandMark", config.brand_logo, config.brand_logo_alt, "#brandText");
   applyLogo("#idealLogo", "#idealLogoFallback", config.ideal_logo, config.ideal_logo_alt);
 
   const brandLabel = [config.brand_name, config.brand_subtitle].filter(Boolean).join(" | ");
