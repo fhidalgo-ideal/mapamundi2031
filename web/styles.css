@@ -376,15 +376,15 @@ nav a:hover {
 }
 
 .polaroid-back-left {
-  left: calc(-1 * (var(--side-figure-w) + 64px));
-  top: 14%;
-  transform: rotate(-10deg);
+  left: calc(-1 * (var(--side-figure-w) + 110px));
+  top: 30%;
+  transform: rotate(11deg);
 }
 
 .polaroid-back-right {
-  right: calc(-1 * (var(--side-figure-w) + 64px));
-  top: 14%;
-  transform: rotate(10deg);
+  right: calc(-1 * (var(--side-figure-w) + 110px));
+  top: 30%;
+  transform: rotate(-11deg);
 }
 
 .hero-copy {
