@@ -113,10 +113,19 @@ a {
   border-radius: var(--card-radius);
 }
 
+/* Breaks out of .page-frame's side padding to run edge-to-edge, unlike
+   every other section which stays inset as a rounded card. */
 .ticker {
   background: var(--ticker-bg);
+  border-radius: 0;
+  left: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
   overflow: hidden;
   padding: 20px 0;
+  position: relative;
+  right: 50%;
+  width: 100vw;
 }
 
 .ticker-track {
@@ -463,7 +472,7 @@ h1 {
 .hero-copy p:not(.eyebrow) {
   color: var(--muted-on-light);
   font-size: clamp(17px, 1.6vw, 21px);
-  line-height: 1.55;
+  line-height: 1.4;
   margin: 0 auto 30px;
   max-width: 560px;
 }
