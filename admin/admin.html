@@ -7,20 +7,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/styles.css?v=20260915-8">
+    <link rel="stylesheet" href="/styles.css?v=20260915-9">
   </head>
   <body>
-    <header class="topbar">
+    <header class="topbar" id="topbar">
       <a class="brand" href="/" aria-label="Granada 2031">
-        <span class="brand-mark"></span>
-        <span>
-          <strong>Granada 2031</strong>
-          <small>Administracion protegida</small>
-        </span>
+        <img class="brand-logo" src="/assets/logo.svg" alt="Granada 2031">
       </a>
-      <nav aria-label="Navegacion de administracion">
-        <a href="/">Ver mapa publico</a>
-      </nav>
+      <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="topbarNav">
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+      <div class="topbar-nav" id="topbarNav">
+        <nav aria-label="Navegacion de administracion">
+          <a href="/">Ver mapa publico</a>
+        </nav>
+      </div>
     </header>
 
     <main class="admin-page">
@@ -118,6 +121,7 @@
       </article>
     </template>
 
+    <script src="/nav-toggle.js?v=20260915-1"></script>
     <script src="admin.js?v=20260915-1"></script>
   </body>
 </html>

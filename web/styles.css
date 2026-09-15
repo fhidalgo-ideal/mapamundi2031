@@ -1765,6 +1765,10 @@ textarea {
     position: static;
   }
 
+  .how-to-contribute .section-heading {
+    text-align: center;
+  }
+
   .how-to-contribute .eyebrow {
     display: block;
     margin-left: auto;

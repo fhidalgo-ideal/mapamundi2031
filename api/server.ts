@@ -1293,6 +1293,7 @@ async function handleSelfDeleteTrace(request: Request, traceId: string): Promise
 const WEB_FILES: Record<string, true> = {
   "/index.html": true,
   "/app.js": true,
+  "/nav-toggle.js": true,
   "/styles.css": true,
   "/politica-de-privacidad.html": true,
   "/aviso-legal.html": true,
