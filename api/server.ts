@@ -33,7 +33,7 @@ const UPLOAD_DIR = process.env.GRANADA_UPLOAD_DIR ?? join(ROOT_DIR, "uploads");
 const DB_PATH = process.env.GRANADA_DB_PATH ?? join(DATA_DIR, "granada2031.sqlite3");
 const CONFIG_PATH = process.env.GRANADA_CONFIG_PATH ?? join(ROOT_DIR, "config.json");
 const SECRETS_PATH = process.env.GRANADA_SECRETS_PATH ?? join(ROOT_DIR, ".dev");
-const APP_VERSION = "2026-05-07-config-footer";
+const APP_VERSION = "2026-09-15-1";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = Number(process.env.GRANADA_MAX_IMAGE_DIMENSION ?? 6000);
 // Max photos per contribution — mirrors PHOTO01's frontend picker cap. The
