@@ -673,3 +673,20 @@ loadPublicConfig().catch(() => {
 loadTraces().catch((error) => {
   archiveGrid.innerHTML = `<p class="empty-state">${error.message}</p>`;
 });
+
+// Keeps the hero polaroids, map markers, stats and gallery in sync with
+// newly approved contributions for anyone who already has the page open,
+// without them having to reload. Paused while the tab isn't visible so an
+// idle background tab doesn't keep polling, and a failed background refresh
+// stays silent rather than replacing already-working content with an error.
+const TRACES_POLL_INTERVAL_MS = 60_000;
+
+function pollTraces() {
+  if (document.hidden) return;
+  loadTraces().catch(() => {});
+}
+
+setInterval(pollTraces, TRACES_POLL_INTERVAL_MS);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) pollTraces();
+});
