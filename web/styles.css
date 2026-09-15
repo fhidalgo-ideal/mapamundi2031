@@ -220,17 +220,15 @@ a {
   align-items: center;
   background: #ffffff;
   box-shadow: 0 6px 20px rgba(33, 28, 18, 0.08);
-  border-radius: 999px;
   display: flex;
   justify-content: space-between;
-  left: var(--page-margin);
-  right: var(--page-margin);
-  margin: 0 auto;
-  max-width: 1280px;
+  left: 0;
+  right: 0;
+  margin: 0;
   min-height: 64px;
-  padding: 10px 10px 10px 22px;
+  padding: 10px var(--page-margin);
   position: fixed;
-  top: 20px;
+  top: 0;
   /* Above the map's own stacked UI (.map-controls/.map-hint at 1000) so it
      can't peek over the fixed header's edge during scroll; below the
      modal/story-panel overlays (2000), which must sit above everything. */
@@ -307,7 +305,7 @@ nav a:hover {
   display: flex;
   justify-content: center;
   min-height: 92vh;
-  padding: 140px clamp(22px, 6vw, 86px) 80px;
+  padding: 120px clamp(22px, 6vw, 86px) 80px;
   position: relative;
 }
 
@@ -640,13 +638,13 @@ h1 {
 }
 
 .admin-page {
-  padding-top: 92px;
+  padding-top: 72px;
 }
 
 .legal-page {
   margin: 0 auto;
   max-width: 900px;
-  padding: 92px clamp(18px, 4vw, 56px) 64px;
+  padding: 72px clamp(18px, 4vw, 56px) 64px;
 }
 
 .legal-page h1 {
