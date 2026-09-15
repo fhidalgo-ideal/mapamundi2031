@@ -665,7 +665,8 @@ function withSecurityHeaders(response: Response): Response {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com",
+    "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; " +
+      "style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com",
   );
   return new Response(response.body, {
     status: response.status,
