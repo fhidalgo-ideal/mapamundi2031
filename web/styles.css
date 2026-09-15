@@ -287,18 +287,6 @@ nav a:hover {
   color: var(--ink-on-light);
 }
 
-.nav-cta {
-  background: var(--coral);
-  border-radius: 999px;
-  color: var(--bg-light);
-  min-height: 40px;
-  padding: 0 20px;
-}
-
-.nav-cta:hover {
-  filter: brightness(0.92);
-}
-
 .hero {
   align-items: center;
   background: var(--bg-light);
@@ -473,6 +461,18 @@ h1 {
   justify-content: center;
   min-height: 46px;
   padding: 0 18px;
+}
+
+.nav-cta {
+  background: var(--coral);
+  border-radius: 999px;
+  color: var(--bg-light);
+  min-height: 40px;
+  padding: 0 20px;
+}
+
+.nav-cta:hover {
+  filter: brightness(0.92);
 }
 
 .button.primary {
