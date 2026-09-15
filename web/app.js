@@ -575,36 +575,6 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-const newsletterForm = document.querySelector("#newsletterForm");
-newsletterForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const status = document.querySelector("#newsletterStatus");
-  const input = document.querySelector("#newsletterEmail");
-  const email = input.value.trim();
-  status.classList.remove("error", "success");
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    status.textContent = "Introduce un correo electronico valido.";
-    status.classList.add("error");
-    return;
-  }
-
-  status.textContent = "Enviando...";
-
-  try {
-    await apiRequest("/notify-signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    newsletterForm.reset();
-    status.textContent = "Listo. Te avisaremos cuando tu foto se publique en el mapa.";
-    status.classList.add("success");
-  } catch (error) {
-    status.textContent = error.message;
-    status.classList.add("error");
-  }
-});
 
 
 document.querySelectorAll("[data-filter]").forEach((button) => {
