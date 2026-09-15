@@ -1712,6 +1712,10 @@ textarea {
   text-underline-offset: 4px;
 }
 
+.footer-links a:hover {
+  color: var(--accent-bright);
+}
+
 .footer-logo-link {
   align-items: center;
   display: inline-flex;

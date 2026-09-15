@@ -19,9 +19,9 @@
     "consent_text": "Acepto que esta fotografia y el texto se usen en la accion cultural Granada 2031.",
     "footer_text": "Granada 2031. Geolocalizacion del Sentimiento.",
     "privacy_label": "Politica de privacidad",
-    "privacy_url": "/politica-de-privacidad",
-    "legal_label": "Aviso legal",
-    "legal_url": "/aviso-legal",
+    "privacy_url": "https://2031granadaideal.es/politica-de-privacidad/",
+    "legal_label": "Politica de cookies",
+    "legal_url": "https://2031granadaideal.es/politica-de-cookies/",
     "ideal_logo": "/assets/ideal-logo.png",
     "ideal_logo_alt": "IDEAL",
     "ideal_url": "https://www.ideal.es"
