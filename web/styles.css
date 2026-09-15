@@ -1584,11 +1584,6 @@ textarea {
   margin: 0;
 }
 
-.footer-main .footer-contact {
-  color: var(--ink);
-  font-weight: var(--fw-semibold);
-}
-
 .footer-links {
   align-items: center;
   display: flex;
