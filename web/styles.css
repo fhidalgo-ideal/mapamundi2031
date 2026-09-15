@@ -120,7 +120,10 @@ a {
 }
 
 .ticker-track {
-  animation: ticker-scroll 24s linear infinite;
+  /* Duration is 4x the original 24s because each half now repeats the
+     phrase 4x (see index.html) to stay wider than the viewport at any
+     screen width — keeping px/s constant instead of scrolling 4x faster. */
+  animation: ticker-scroll 96s linear infinite;
   display: flex;
   width: max-content;
 }
