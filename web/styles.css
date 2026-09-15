@@ -324,31 +324,6 @@ nav a:hover {
   color: transparent;
 }
 
-.hero-decor {
-  background: var(--surface-2);
-  border: 1px solid var(--line-light);
-  border-radius: 4px;
-  box-shadow: 0 18px 40px rgba(26, 26, 26, 0.1);
-  height: clamp(180px, 20vw, 250px);
-  position: absolute;
-  width: var(--side-figure-w);
-  z-index: 0;
-}
-
-/* Sits further out than the polaroid it peeks from behind, so the stacked
-   look holds at every width instead of the two boxes converging together. */
-.hero-decor-left {
-  left: calc(-1 * (var(--side-figure-w) + 64px));
-  top: 14%;
-  transform: rotate(-10deg);
-}
-
-.hero-decor-right {
-  right: calc(-1 * (var(--side-figure-w) + 64px));
-  top: 14%;
-  transform: rotate(10deg);
-}
-
 .polaroid {
   background: #fffdf8;
   border: 1px solid var(--line-light);
@@ -392,6 +367,24 @@ nav a:hover {
   right: calc(-1 * (var(--side-figure-w) + 24px));
   top: 4%;
   transform: rotate(6deg);
+}
+
+/* The second photo peeking from behind each front polaroid: same card look,
+   just further out and rotated more, and behind it in the stacking order. */
+.polaroid-back {
+  z-index: 0;
+}
+
+.polaroid-back-left {
+  left: calc(-1 * (var(--side-figure-w) + 64px));
+  top: 14%;
+  transform: rotate(-10deg);
+}
+
+.polaroid-back-right {
+  right: calc(-1 * (var(--side-figure-w) + 64px));
+  top: 14%;
+  transform: rotate(10deg);
 }
 
 .hero-copy {
@@ -671,11 +664,11 @@ h1 {
     gap: 24px;
   }
 
-  /* The flanking polaroid/decor cards are absolutely positioned outside the
-     hero-copy column and overflow the viewport on narrow screens; they're
-     decorative, so hide them rather than force a cramped stacked layout. */
-  .hero-inner .polaroid,
-  .hero-decor {
+  /* The flanking polaroid cards (front and back) are absolutely positioned
+     outside the hero-copy column and overflow the viewport on narrow
+     screens; they're decorative, so hide them rather than force a cramped
+     stacked layout. */
+  .hero-inner .polaroid {
     display: none;
   }
 }

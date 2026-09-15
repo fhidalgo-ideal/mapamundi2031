@@ -289,6 +289,8 @@ function renderStats() {
 const HERO_POLAROID_FALLBACKS = [
   { photo: "/uploads/824f6704-0caa-4882-9786-6b79f5e9b6f6.jpg", city: "Berlin" },
   { photo: "/uploads/4bbd2721-5fd7-4132-8faa-158c564ee03f.jpg", city: "Buenos Aires" },
+  { photo: "/uploads/b930a5a2-5c60-416b-aade-1e48a13532cf.jpg", city: "Tokio" },
+  { photo: "/uploads/d4ab0d26-2df6-4c90-adad-dd3fe135f423.jpg", city: "Estambul" },
 ];
 
 function renderHeroPolaroids() {
@@ -298,6 +300,8 @@ function renderHeroPolaroids() {
   const cards = [
     document.querySelector("#heroPolaroidLeft"),
     document.querySelector("#heroPolaroidRight"),
+    document.querySelector("#heroPolaroidLeftBack"),
+    document.querySelector("#heroPolaroidRightBack"),
   ];
 
   cards.forEach((card, index) => {
