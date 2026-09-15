@@ -477,7 +477,7 @@ h1 {
 }
 
 .nav-cta {
-  background: var(--accent-bright);
+  background: #b55c2a;
   border-radius: 999px;
   color: var(--bg-light);
   font-family: var(--font-family-base);
