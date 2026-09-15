@@ -225,12 +225,12 @@ a {
   }
 
   /* The 1400:760 desktop aspect ratio crushes the map into a short strip on
-     a narrow phone (full width / ~1.84 = a couple hundred px tall). Size it
-     to most of the viewport height instead, so it reads as a real map to
-     explore rather than a sliver. */
+     a narrow phone. A vh-based height instead caused overflow, since mobile
+     browsers resize the viewport (address bar show/hide) after layout,
+     leaving Leaflet's tiles briefly larger than their rounded container.
+     A fixed portrait ratio (9:16) is stable regardless of viewport chrome. */
   .map-canvas-wrap {
-    aspect-ratio: auto;
-    height: 80vh;
+    aspect-ratio: 9 / 16;
   }
 }
 
@@ -1712,8 +1712,10 @@ textarea {
 }
 
 @media (max-width: 900px) {
+  /* The header no longer floats fixed on mobile (below), so nothing after
+     an anchor jump needs clearance for it anymore. */
   html {
-    scroll-padding-top: 160px;
+    scroll-padding-top: 0;
   }
 
   /* Matches the header's own 12px mobile inset (below) — .page-frame's
@@ -1724,15 +1726,14 @@ textarea {
     --page-margin: 12px;
   }
 
+  /* Scrolls away with the page instead of floating fixed over content. */
   .topbar {
     align-items: flex-start;
     border-radius: 24px;
     flex-direction: column;
     gap: 12px;
-    left: 12px;
-    right: 12px;
-    top: 12px;
-    position: fixed;
+    margin: 12px 12px 0;
+    position: static;
   }
 
   .topbar-nav {
@@ -1750,8 +1751,19 @@ textarea {
     flex-shrink: 0;
   }
 
+  /* These three top paddings were only ever tuned for clearance under the
+     fixed floating header (now static/in-flow on mobile, see .topbar
+     above), so they shrink to plain breathing room. */
   .legal-page {
-    padding-top: 138px;
+    padding-top: 32px;
+  }
+
+  .hero {
+    padding-top: 32px;
+  }
+
+  .admin-page {
+    padding-top: 24px;
   }
 
   .map-toolbar,
