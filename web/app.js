@@ -7,7 +7,8 @@ const emotionLabels = {
   futuro: "Futuro"
 };
 
-const ARCHIVE_BATCH_SIZE = 8;
+// 20 = 5 rows on desktop's 4-column archive grid.
+const ARCHIVE_BATCH_SIZE = 20;
 
 let traces = [];
 let archiveVisibleCount = ARCHIVE_BATCH_SIZE;
