@@ -19,7 +19,7 @@ import {
 } from "./db.ts";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, normalize, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 
 // server.ts lives in api/; BASE_DIR is that folder, ROOT_DIR is the repo root.
 // Runtime state (data/, uploads/, config.json, .dev) and the static folders
@@ -1303,8 +1303,12 @@ const ROOT_FILES: Record<string, true> = { "/config.json": true };
 const WEB_DIRS = ["/assets/", "/vendor/"];
 
 // Confine a resolved path to its base dir, defeating traversal via `..`.
+// Splits on the URL's own "/" separator before any platform-specific
+// normalization: on Windows, normalize() rewrites "/" to "\" first, which
+// leaves nothing to split on and makes resolve() treat the single leftover
+// "\"-prefixed segment as drive-root-relative, escaping baseDir entirely.
 function confineToDir(baseDir: string, cleaned: string): string | null {
-  const segments = normalize(cleaned)
+  const segments = cleaned
     .split("/")
     .filter((segment) => segment && segment !== "." && segment !== "..");
   const resolved = resolve(baseDir, ...segments);
@@ -1322,7 +1326,8 @@ function resolveStaticPath(pathname: string): string | null {
   // /uploads/* resolves against UPLOAD_DIR (which GRANADA_UPLOAD_DIR can move
   // outside ROOT_DIR, e.g. for isolated tests), not against the project root.
   if (cleaned.startsWith("/uploads/")) {
-    const segments = normalize(cleaned.slice("/uploads/".length))
+    const segments = cleaned
+      .slice("/uploads/".length)
       .split("/")
       .filter((segment) => segment && segment !== "." && segment !== "..");
     const resolved = resolve(UPLOAD_DIR, ...segments);
