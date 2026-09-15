@@ -223,15 +223,6 @@ a {
     position: relative;
     transform: none;
   }
-
-  /* The 1400:760 desktop aspect ratio crushes the map into a short strip on
-     a narrow phone. A vh-based height instead caused overflow, since mobile
-     browsers resize the viewport (address bar show/hide) after layout,
-     leaving Leaflet's tiles briefly larger than their rounded container.
-     A fixed portrait ratio (9:16) is stable regardless of viewport chrome. */
-  .map-canvas-wrap {
-    aspect-ratio: 9 / 16;
-  }
 }
 
 .topbar {
@@ -1718,6 +1709,18 @@ textarea {
     scroll-padding-top: 0;
   }
 
+  /* The 1400:760 desktop aspect ratio crushes the map into a short strip on
+     a narrow phone. A vh-based height instead overflowed, since mobile
+     browsers resize the viewport (address bar show/hide) after layout,
+     leaving Leaflet's tiles briefly larger than their rounded container.
+     A fixed portrait ratio (9:16) is stable regardless of viewport chrome.
+     (Must live in a media query positioned after the base .map-canvas-wrap
+     rule above — an earlier one loses the cascade to it regardless of the
+     media condition, which is what silently broke this the first time.) */
+  .map-canvas-wrap {
+    aspect-ratio: 9 / 16;
+  }
+
   /* Matches the header's own 12px mobile inset (below) — .page-frame's
      padding and everything else keyed off this token tighten up together
      instead of the header shrinking while the rest of the page keeps the
@@ -1764,6 +1767,12 @@ textarea {
 
   .admin-page {
     padding-top: 24px;
+  }
+
+  /* Desktop's 140px/96px (top/bottom) was tuned for a large standalone
+     banner; on mobile it just reads as a lopsided gap above the quote. */
+  .dark-pullquote-banner {
+    padding: 56px clamp(18px, 4vw, 56px) 56px;
   }
 
   .map-toolbar,
@@ -1818,7 +1827,11 @@ textarea {
 @media (max-width: 560px) {
   .hero {
     min-height: 86vh;
-    padding-top: 180px;
+    /* Was 180px, tuned for clearance under the old fixed floating header.
+       The header is static/in-flow on mobile now (see the 900px query),
+       so this only needs to be plain breathing room like the 900px rule's
+       32px — not re-inflated back up at this narrower breakpoint. */
+    padding-top: 20px;
   }
 
   h1 {
@@ -1835,7 +1848,6 @@ textarea {
 
   .archive-grid {
     gap: 20px;
-    grid-template-columns: 1fr;
   }
 
   .map-shell {
