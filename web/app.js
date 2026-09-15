@@ -564,9 +564,11 @@ form.addEventListener("submit", async (event) => {
     locationSummary.hidden = true;
     setLocationMessage("");
 
-    // Display deletion token to user
-    if (response.deletionToken) {
-      const tokenMessage = `Recibido. Tu luz esta guardada en el servidor y queda en revision.\n\n⚠️ GUARDA ESTE CODIGO PARA ELIMINAR TU CONTRIBUCION:\n\n${response.deletionToken}\n\nSi lo pierdes, no podras borrar tu aportacion. Cópialo a un lugar seguro.`;
+    // Display the deletion code (trace id + token, joined) so it can later be
+    // pasted as-is into the "eliminar tu foto" form further down the page.
+    if (response.deletionToken && response.trace?.id) {
+      const deletionCode = `${response.trace.id}:${response.deletionToken}`;
+      const tokenMessage = `Recibido. Tu luz esta guardada en el servidor y queda en revision.\n\n⚠️ GUARDA ESTE CODIGO PARA ELIMINAR TU CONTRIBUCION:\n\n${deletionCode}\n\nSi lo pierdes, no podras borrar tu aportacion. Cópialo a un lugar seguro.`;
       status.textContent = tokenMessage;
       status.style.whiteSpace = "pre-wrap";
     } else {
@@ -638,6 +640,41 @@ document.addEventListener("keydown", (event) => {
 
 document.querySelector("#heroViewMap")?.addEventListener("click", () => {
   document.querySelector(".map-section")?.scrollIntoView({ behavior: "smooth" });
+});
+
+// Self-service deletion: the code shown after uploading is "<trace id>:<deletion
+// token>" (see the trace form handler above) joined into one string so a
+// visitor only has to copy-paste a single value here, instead of needing two.
+const deleteTraceForm = document.querySelector("#deleteTraceForm");
+deleteTraceForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const status = document.querySelector("#deleteTraceStatus");
+  const input = document.querySelector("#deleteTraceCode");
+  const code = input.value.trim();
+  status.classList.remove("error", "success");
+
+  const [traceId, token] = code.split(":");
+  if (!traceId || !token) {
+    status.textContent = "Codigo no valido. Pega el codigo completo que recibiste al subir tu foto.";
+    status.classList.add("error");
+    return;
+  }
+
+  status.textContent = "Eliminando...";
+
+  try {
+    await apiRequest(`/traces/${encodeURIComponent(traceId)}`, {
+      method: "DELETE",
+      headers: { "X-Deletion-Token": token },
+    });
+    deleteTraceForm.reset();
+    status.textContent = "Listo. Tu contribucion fue eliminada.";
+    status.classList.add("success");
+    await loadTraces();
+  } catch (error) {
+    status.textContent = error.message;
+    status.classList.add("error");
+  }
 });
 
 loadPublicConfig().catch(() => {

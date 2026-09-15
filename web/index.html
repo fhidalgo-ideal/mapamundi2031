@@ -186,7 +186,16 @@
 
       <section class="newsletter-banner card" aria-labelledby="newsletter-title">
         <div class="newsletter-inner">
-          <h2 class="newsletter-title" id="newsletter-title">Cada foto que compartes se convierte en una luz más en el mapa de Granada</h2>
+          <h2 class="newsletter-title" id="newsletter-title">¿Quieres eliminar tu foto?</h2>
+          <p class="newsletter-subtitle">Pega aquí el código que recibiste al subirla.</p>
+          <form class="newsletter-form" id="deleteTraceForm" novalidate>
+            <div class="newsletter-control">
+              <input class="newsletter-input" id="deleteTraceCode" name="code" type="text"
+                required autocomplete="off" placeholder="Código de eliminación" aria-label="Código de eliminación">
+              <button class="newsletter-submit" type="submit" aria-label="Eliminar mi foto">→</button>
+            </div>
+            <p class="newsletter-status" id="deleteTraceStatus" role="status" aria-live="polite"></p>
+          </form>
         </div>
       </section>
 
