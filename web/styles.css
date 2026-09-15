@@ -223,6 +223,15 @@ a {
     position: relative;
     transform: none;
   }
+
+  /* The 1400:760 desktop aspect ratio crushes the map into a short strip on
+     a narrow phone (full width / ~1.84 = a couple hundred px tall). Size it
+     to most of the viewport height instead, so it reads as a real map to
+     explore rather than a sliver. */
+  .map-canvas-wrap {
+    aspect-ratio: auto;
+    height: 80vh;
+  }
 }
 
 .topbar {
@@ -1705,6 +1714,14 @@ textarea {
 @media (max-width: 900px) {
   html {
     scroll-padding-top: 160px;
+  }
+
+  /* Matches the header's own 12px mobile inset (below) — .page-frame's
+     padding and everything else keyed off this token tighten up together
+     instead of the header shrinking while the rest of the page keeps the
+     wider 24px desktop margin. */
+  :root {
+    --page-margin: 12px;
   }
 
   .topbar {
