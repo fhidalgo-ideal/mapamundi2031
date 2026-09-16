@@ -271,7 +271,9 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
     }
   } else {
     // SQLite mode - mongodb is never imported, avoiding Bun's node:v8 load failure
-    mkdirSync(sqlitePath.substring(0, sqlitePath.lastIndexOf("/")), { recursive: true });
+    //mkdirSync(sqlitePath.substring(0, sqlitePath.lastIndexOf("/")), { recursive: true });
+    mkdirSync(require("path").dirname(sqlitePath), { recursive: true });
+
     sqliteDb = new Database(sqlitePath);
 
     // Create tables (exact same schema as initDb() in server.ts)
