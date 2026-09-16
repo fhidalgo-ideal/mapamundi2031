@@ -9,6 +9,8 @@ const adminLogout = document.querySelector("#adminLogout");
 const reviewList = document.querySelector("#reviewList");
 const pendingCount = document.querySelector("#pendingCount");
 const adminCharts = document.querySelector("#adminCharts");
+const adminVotes = document.querySelector("#adminVotes");
+const votesList = document.querySelector("#votesList");
 const chartFrom = document.querySelector("#chartFrom");
 const chartTo = document.querySelector("#chartTo");
 const chartByDate = document.querySelector("#chartByDate");
@@ -65,6 +67,7 @@ function renderAdmin() {
   adminLogout.classList.toggle("hidden", !adminToken);
   renderReviewList();
   renderCharts();
+  renderVotes();
 }
 
 function normalize(value) {
@@ -300,6 +303,86 @@ function renderReviewList() {
     editForm.addEventListener("submit", (event) => saveTraceEdit(event, trace.id));
     node.querySelector(".delete").addEventListener("click", () => deleteTrace(trace));
     reviewList.appendChild(item);
+  });
+}
+
+// One row per photo (cover + extras), across every trace — not just
+// approved ones, since nothing today stops a photo from being voted on
+// before it's approved, and admins should be able to see that.
+function flattenPhotosByVotes() {
+  const rows = [];
+  adminTraces.forEach((trace) => {
+    (trace.photos || []).forEach((photo) => {
+      rows.push({ photo, trace });
+    });
+  });
+  rows.sort((a, b) => b.photo.voteCount - a.photo.voteCount);
+  return rows;
+}
+
+// Reuses the review list's own search box to locate the trace a voted photo
+// belongs to, instead of adding a second way to jump to a contribution.
+function jumpToReview(trace) {
+  reviewStatusFilter = "all";
+  statusFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.statusFilter === "all"));
+  reviewSearchQuery = trace.name;
+  reviewSearchInput.value = trace.name;
+  renderReviewList();
+  reviewList.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderVotes() {
+  if (!adminToken) {
+    adminVotes.classList.add("hidden");
+    return;
+  }
+  adminVotes.classList.remove("hidden");
+
+  const rows = flattenPhotosByVotes();
+  votesList.innerHTML = "";
+
+  if (rows.length === 0) {
+    votesList.innerHTML = `<p class="empty-state">Aun no hay fotos.</p>`;
+    return;
+  }
+
+  rows.forEach(({ photo, trace }) => {
+    const item = document.createElement("article");
+    item.className = "votes-item";
+
+    const img = document.createElement("img");
+    img.src = photo.url;
+    img.alt = `Foto de ${trace.name}`;
+    item.appendChild(img);
+
+    const info = document.createElement("div");
+    info.className = "votes-item-info";
+    const title = document.createElement("h4");
+    title.textContent = trace.name;
+    const place = document.createElement("small");
+    place.textContent = `${trace.city}, ${trace.country}`;
+    const badge = document.createElement("span");
+    badge.className = `status-badge ${trace.status}`;
+    badge.textContent = STATUS_LABELS[trace.status] || trace.status;
+    info.append(title, place, badge);
+    item.appendChild(info);
+
+    const count = document.createElement("div");
+    count.className = "votes-item-count";
+    count.append(String(photo.voteCount));
+    const countLabel = document.createElement("span");
+    countLabel.textContent = "votos";
+    count.appendChild(countLabel);
+    item.appendChild(count);
+
+    const jumpButton = document.createElement("button");
+    jumpButton.type = "button";
+    jumpButton.className = "text-button";
+    jumpButton.textContent = "Ver en revision";
+    jumpButton.addEventListener("click", () => jumpToReview(trace));
+    item.appendChild(jumpButton);
+
+    votesList.appendChild(item);
   });
 }
 

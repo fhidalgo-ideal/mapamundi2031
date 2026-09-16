@@ -1683,6 +1683,61 @@ textarea {
   min-height: 40px;
 }
 
+.votes-panel {
+  margin-bottom: 24px;
+}
+
+.votes-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.votes-item {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 56px 1fr auto auto;
+  padding: 8px 12px;
+}
+
+.votes-item > img {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+  width: 56px;
+}
+
+.votes-item-info h4 {
+  font-size: 14px;
+  margin: 0 0 2px;
+}
+
+.votes-item-info small {
+  color: var(--muted);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.votes-item-count {
+  color: var(--gold);
+  font-size: 20px;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.votes-item-count span {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
 .empty-state {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--line);
@@ -1920,6 +1975,17 @@ textarea {
 
   .review-actions {
     grid-column: 1 / -1;
+  }
+
+  .votes-item {
+    grid-template-columns: 56px 1fr;
+  }
+
+  .votes-item-count,
+  .votes-item .text-button {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
   }
 
   .footer-inner {
