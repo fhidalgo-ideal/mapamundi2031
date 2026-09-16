@@ -275,12 +275,12 @@ function renderReviewList() {
     img.src = trace.photo;
     img.alt = `Revision de ${trace.name}`;
     const extraPhotos = node.querySelector(".review-photos-extra");
-    const extraPhotoUrls = (trace.photos || []).slice(1);
+    const extraPhotoEntries = (trace.photos || []).slice(1);
     extraPhotos.innerHTML = "";
-    extraPhotos.classList.toggle("hidden", extraPhotoUrls.length === 0);
-    extraPhotoUrls.forEach((photoUrl, index) => {
+    extraPhotos.classList.toggle("hidden", extraPhotoEntries.length === 0);
+    extraPhotoEntries.forEach((photo, index) => {
       const extraImage = document.createElement("img");
-      extraImage.src = photoUrl;
+      extraImage.src = photo.url;
       extraImage.alt = `Foto adicional ${index + 2} de ${trace.name}`;
       extraPhotos.appendChild(extraImage);
     });

@@ -13,11 +13,13 @@ import {
   addAuditLog,
   getAuditLogs,
   addNotifySignup,
+  voteForPhoto,
   closeDatabase,
   type TraceRecord,
   type TracePhotoRecord,
 } from "./db.ts";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { lookup as dnsLookup } from "node:dns/promises";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
@@ -55,6 +57,10 @@ const ADMIN_LOGIN_LOCKOUT_WINDOW_MS = Number(
 const GEOCODE_SEARCH_RATE_LIMIT_MAX = Number(process.env.GRANADA_GEOCODE_SEARCH_RATE_LIMIT_MAX ?? 20);
 const GEOCODE_SEARCH_RATE_LIMIT_WINDOW_MS = Number(
   process.env.GRANADA_GEOCODE_SEARCH_RATE_LIMIT_WINDOW_MS ?? 5 * 60 * 1000,
+);
+const VOTE_RATE_LIMIT_MAX = Number(process.env.GRANADA_VOTE_RATE_LIMIT_MAX ?? 30);
+const VOTE_RATE_LIMIT_WINDOW_MS = Number(
+  process.env.GRANADA_VOTE_RATE_LIMIT_WINDOW_MS ?? 60 * 1000,
 );
 const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -126,13 +132,41 @@ function ensureConfig() {
   writeFileSync(CONFIG_PATH, JSON.stringify({ public: DEFAULT_PUBLIC_CONFIG }, null, 2), "utf-8");
 }
 
+// Fallback used only when .dev exists but can't be rewritten to add
+// photo_vote_pepper (production mounts it read-only — see docker-compose.prod.yml).
+// Stable for this process's lifetime, so votes still work; it just means
+// ip_hash values stop matching across a restart until an operator adds the
+// key to /etc/granada/admin-secrets.json by hand, same as the other secrets.
+let inMemoryPhotoVotePepper: string | null = null;
+
 function ensureSecrets() {
-  if (existsSync(SECRETS_PATH)) return;
-  const defaultSecrets = {
-    admin_password: "cambia-esta-password",
-    admin_session_secret: randomUUID().replace(/-/g, ""),
-  };
-  writeFileSync(SECRETS_PATH, JSON.stringify(defaultSecrets, null, 2), "utf-8");
+  if (!existsSync(SECRETS_PATH)) {
+    const defaultSecrets = {
+      admin_password: "cambia-esta-password",
+      admin_session_secret: randomUUID().replace(/-/g, ""),
+      photo_vote_pepper: randomUUID().replace(/-/g, ""),
+    };
+    writeFileSync(SECRETS_PATH, JSON.stringify(defaultSecrets, null, 2), "utf-8");
+    return;
+  }
+  // Backfill secrets introduced after a deployment's .dev file already
+  // existed, so upgrading never requires editing it by hand — except in
+  // production, where the file is read-only and the operator must add it.
+  const existing = JSON.parse(readFileSync(SECRETS_PATH, "utf-8") || "{}") as Record<string, unknown>;
+  if (!existing.photo_vote_pepper) {
+    existing.photo_vote_pepper = randomUUID().replace(/-/g, "");
+    try {
+      writeFileSync(SECRETS_PATH, JSON.stringify(existing, null, 2), "utf-8");
+    } catch (error) {
+      if (!inMemoryPhotoVotePepper) {
+        inMemoryPhotoVotePepper = randomUUID().replace(/-/g, "");
+        console.error(
+          `[server.ts] No se pudo escribir photo_vote_pepper en ${SECRETS_PATH} (¿montado de solo lectura?). ` +
+            "Usando un pepper temporal en memoria hasta que se anada a /etc/granada/admin-secrets.json.",
+        );
+      }
+    }
+  }
 }
 
 function loadConfig(): Record<string, unknown> {
@@ -141,8 +175,11 @@ function loadConfig(): Record<string, unknown> {
   const config = JSON.parse(readFileSync(CONFIG_PATH, "utf-8") || "{}") as Record<string, unknown>;
   const secretsText = readFileSync(SECRETS_PATH, "utf-8");
   Object.assign(config, JSON.parse(secretsText));
-  if (!config.admin_password || !config.admin_session_secret) {
-    throw new Error(".dev debe definir admin_password y admin_session_secret");
+  if (!config.photo_vote_pepper && inMemoryPhotoVotePepper) {
+    config.photo_vote_pepper = inMemoryPhotoVotePepper;
+  }
+  if (!config.admin_password || !config.admin_session_secret || !config.photo_vote_pepper) {
+    throw new Error(".dev debe definir admin_password, admin_session_secret y photo_vote_pepper");
   }
   return config;
 }
@@ -758,8 +795,17 @@ async function recordAuditLog(action: string, traceId: string | null, sourceIp: 
 // Map db.ts TraceRecord to the public API shape: fetch extra photos, build photos[],
 // rename created_at→createdAt, and strip private fields (deletion_token_hash, consent,
 // email — contributors' addresses are never exposed outside the admin panel).
+//
+// Each entry in photos[] carries the id POST /api/photos/:id/vote expects. The
+// cover photo has no row of its own in trace_photos (see TracePhotoRecord), so
+// it borrows the trace's own id — safe because a trace id and a trace_photos
+// id are never the same value.
 async function dbTraceToPublic(trace: TraceRecord) {
   const extraPhotos = await getTracePhotos(trace.id);
+  const photos = [
+    { id: trace.id, url: trace.photo, voteCount: trace.photo_vote_count ?? 0 },
+    ...extraPhotos.map((p) => ({ id: p.id, url: p.path, voteCount: p.vote_count ?? 0 })),
+  ];
   return {
     id: trace.id,
     name: trace.name,
@@ -771,7 +817,7 @@ async function dbTraceToPublic(trace: TraceRecord) {
     emotion: trace.emotion,
     feeling: trace.feeling,
     photo: trace.photo,
-    photos: [trace.photo, ...extraPhotos.map((p) => p.path)],
+    photos,
     status: trace.status,
     createdAt: trace.created_at,
   };
@@ -851,13 +897,43 @@ interface IpResolvingServer {
 
 const TRUSTED_PROXY_ADDRESSES: Record<string, true> = { "127.0.0.1": true, "::1": true };
 
+// In the Compose topology, the gateway (service "proxy", container
+// granada-gateway) reaches the API over the internal Docker network, not
+// loopback — so its address is never in the static set above, and
+// X-Forwarded-For from it was silently never trusted, collapsing every
+// visitor behind the gateway into one IP for rate limits, audit logs, and
+// photo votes alike. Docker's embedded DNS resolves the service name to its
+// current container IP; re-resolving periodically (rather than once at
+// startup) means a `docker compose restart proxy` — which can reassign that
+// IP — doesn't permanently break trust until the API is also restarted.
+const TRUSTED_PROXY_HOSTNAME = process.env.GRANADA_TRUSTED_PROXY_HOST ?? "proxy";
+const dynamicTrustedProxyAddresses = new Set<string>();
+
+async function refreshTrustedProxyAddress(): Promise<void> {
+  try {
+    const { address } = await dnsLookup(TRUSTED_PROXY_HOSTNAME);
+    dynamicTrustedProxyAddresses.clear();
+    dynamicTrustedProxyAddresses.add(address);
+  } catch {
+    // Not running behind the Compose gateway (e.g. `bun run api/server.ts`
+    // directly in local dev, or the test suite's spawned child process) —
+    // leave the dynamic set empty; static loopback trust still applies.
+  }
+}
+
+void refreshTrustedProxyAddress();
+setInterval(refreshTrustedProxyAddress, 30_000);
+
 // Trust X-Forwarded-For only when the direct socket peer is a local/trusted
-// proxy (e.g. an nginx reverse proxy on the same host forwarding over
-// loopback); otherwise a direct, untrusted client could spoof the header
-// and get a fresh rate-limit bucket on every request.
+// proxy (loopback, or the Compose gateway resolved above); otherwise a
+// direct, untrusted client could spoof the header and get a fresh
+// rate-limit bucket — or a fresh photo vote — on every request.
 function getClientIp(request: Request, server?: IpResolvingServer): string {
   const remoteAddress = server?.requestIP(request)?.address ?? null;
-  if (remoteAddress && TRUSTED_PROXY_ADDRESSES[remoteAddress]) {
+  const isTrusted =
+    remoteAddress !== null &&
+    (TRUSTED_PROXY_ADDRESSES[remoteAddress] === true || dynamicTrustedProxyAddresses.has(remoteAddress));
+  if (isTrusted) {
     const forwardedFor = request.headers.get("X-Forwarded-For");
     if (forwardedFor) {
       const candidate = forwardedFor.split(",")[0]?.trim();
@@ -898,6 +974,43 @@ const checkGeocodeSearchRateLimit = createRateLimiter(
   GEOCODE_SEARCH_RATE_LIMIT_MAX,
   GEOCODE_SEARCH_RATE_LIMIT_WINDOW_MS,
 );
+const checkVoteRateLimit = createRateLimiter(VOTE_RATE_LIMIT_MAX, VOTE_RATE_LIMIT_WINDOW_MS);
+
+// Peppered so a leak of photo_votes alone (without the separately-stored .dev
+// secret) can't be dictionary-attacked back into the IPs it was built from.
+function hashPhotoVoteIp(ip: string, pepper: string): string {
+  return createHash("sha256").update(`${ip}:${pepper}`).digest("hex");
+}
+
+// One vote per IP per photo (POST /api/photos/:id/vote). No visitor login
+// exists, so "IP" is the closest thing to an identity; a repeat vote from the
+// same IP is treated as the same voter and answered idempotently (200, not
+// 409) rather than as an error, since a shared IP (office NAT, mobile carrier)
+// can just as easily mean a different real person behind it.
+async function handleVotePhoto(
+  request: Request,
+  photoId: string,
+  server?: IpResolvingServer,
+): Promise<Response> {
+  if (!photoId) {
+    return errorResponse("Falta el identificador de la fotografia.", 404);
+  }
+  const clientIp = getClientIp(request, server);
+  const rateLimit = checkVoteRateLimit(clientIp);
+  if (rateLimit.limited) {
+    const response = errorResponse("Demasiados votos desde esta conexion. Intentalo mas tarde.", 429);
+    response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
+    return response;
+  }
+
+  const pepper = loadConfig().photo_vote_pepper as string;
+  const ipHash = hashPhotoVoteIp(clientIp, pepper);
+  const result = await voteForPhoto(photoId, ipHash, nowIso());
+  if (!result) {
+    return errorResponse("No existe esa fotografia.", 404);
+  }
+  return jsonResponse({ voted: true, alreadyVoted: result.alreadyVoted, count: result.count });
+}
 
 function createFailureLockout(maxFailures: number, windowMs: number) {
   const failuresByKey = new Map<string, number[]>();
@@ -1428,6 +1541,10 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
     }
     if (normalizedPath === "/api/notify-signup") {
       return handleNotifySignup(request, server);
+    }
+    if (normalizedPath.startsWith("/api/photos/") && normalizedPath.endsWith("/vote")) {
+      const photoId = normalizedPath.slice("/api/photos/".length, -"/vote".length);
+      return handleVotePhoto(request, photoId, server);
     }
     if (path.startsWith("/api/")) {
       return errorResponse("Endpoint de API no encontrado.", 404);

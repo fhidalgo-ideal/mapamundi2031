@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260915-14">
+    <link rel="stylesheet" href="styles.css?v=20260916-1">
   </head>
   <body>
     <header class="topbar" id="topbar">
@@ -310,6 +310,10 @@
       <button class="icon-button" id="closeStory" type="button" aria-label="Cerrar historia">x</button>
       <img id="storyImage" alt="">
       <div class="story-thumbs hidden" id="storyThumbs"></div>
+      <div class="story-vote">
+        <button class="button ghost" id="storyVoteButton" type="button">Votar esta foto</button>
+        <span class="story-vote__count"><span id="storyVoteCount">0</span> votos</span>
+      </div>
       <div class="story-body">
         <span id="storyEmotion" class="emotion"></span>
         <h3 id="storyTitle"></h3>
@@ -342,6 +346,6 @@
 
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="nav-toggle.js?v=20260915-1"></script>
-    <script src="app.js?v=20260915-4"></script>
+    <script src="app.js?v=20260916-1"></script>
   </body>
 </html>

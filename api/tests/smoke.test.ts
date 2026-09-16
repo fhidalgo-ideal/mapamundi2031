@@ -922,8 +922,12 @@ describe("smoke", () => {
     const body = await response.json();
     expect(Array.isArray(body.trace.photos)).toBe(true);
     expect(body.trace.photos.length).toBe(3);
-    // Cover stays backward-compatible and is the first element of photos[].
-    expect(body.trace.photo).toBe(body.trace.photos[0]);
+    // Cover stays backward-compatible: its URL is the first element of
+    // photos[], which also carries an id (for voting) and a vote count.
+    expect(body.trace.photo).toBe(body.trace.photos[0].url);
+    expect(body.trace.photos[0].id).toBe(body.trace.id);
+    expect(body.trace.photos[0].voteCount).toBe(0);
+    expect(body.trace.photos[1].id).not.toBe(body.trace.photos[0].id);
     const multiTraceId = body.trace.id as string;
 
     const approveResponse = await fetch(`${baseUrl}/api/admin/traces/${multiTraceId}/status`, {
@@ -989,7 +993,7 @@ describe("smoke", () => {
     const createBody = await createResponse.json();
     const traceId = createBody.trace.id as string;
     const deletionToken = createBody.deletionToken as string;
-    const photoPaths = (createBody.trace.photos as string[]).map((p) => join(dataDir, p));
+    const photoPaths = (createBody.trace.photos as { url: string }[]).map((p) => join(dataDir, p.url));
     expect(photoPaths.length).toBe(3);
     for (const photoPath of photoPaths) {
       expect(existsSync(photoPath)).toBe(true);
@@ -1003,6 +1007,80 @@ describe("smoke", () => {
     for (const photoPath of photoPaths) {
       expect(existsSync(photoPath)).toBe(false);
     }
+  });
+
+  test("VOTE01: POST /api/photos/:id/vote registers a vote and is idempotent per IP", async () => {
+    const photoBytes = Uint8Array.from(atob(TINY_JPEG_BASE64), (char) => char.charCodeAt(0));
+    const form = new FormData();
+    form.set("name", "Vote Test");
+    form.set("email", "vote-test@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Una foto para votar.");
+    form.set("consent", "true");
+    form.append("photo", new File([photoBytes], "photo.jpg", { type: "image/jpeg" }));
+
+    const createResponse = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.160" },
+      body: form,
+    });
+    expect(createResponse.status).toBe(201);
+    const createBody = await createResponse.json();
+    const photoId = createBody.trace.photos[0].id as string;
+
+    const voteHeaders = { "X-Forwarded-For": "203.0.113.161" };
+
+    const firstVote = await fetch(`${baseUrl}/api/photos/${photoId}/vote`, {
+      method: "POST",
+      headers: voteHeaders,
+    });
+    expect(firstVote.status).toBe(200);
+    const firstBody = await firstVote.json();
+    expect(firstBody.alreadyVoted).toBe(false);
+    expect(firstBody.count).toBe(1);
+
+    // Same IP votes again: idempotent 200, not 409 — count does not move.
+    const secondVote = await fetch(`${baseUrl}/api/photos/${photoId}/vote`, {
+      method: "POST",
+      headers: voteHeaders,
+    });
+    expect(secondVote.status).toBe(200);
+    const secondBody = await secondVote.json();
+    expect(secondBody.alreadyVoted).toBe(true);
+    expect(secondBody.count).toBe(1);
+
+    // A different IP can still vote the same photo.
+    const thirdVote = await fetch(`${baseUrl}/api/photos/${photoId}/vote`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.162" },
+    });
+    expect(thirdVote.status).toBe(200);
+    const thirdBody = await thirdVote.json();
+    expect(thirdBody.alreadyVoted).toBe(false);
+    expect(thirdBody.count).toBe(2);
+
+    // The public listing reflects the vote count once approved.
+    const approveResponse = await fetch(`${baseUrl}/api/admin/traces/${createBody.trace.id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    expect(approveResponse.status).toBe(200);
+    const publicResponse = await fetch(`${baseUrl}/api/traces`);
+    const publicBody = await publicResponse.json();
+    const approved = publicBody.traces.find((trace: { id: string }) => trace.id === createBody.trace.id);
+    expect(approved.photos[0].voteCount).toBe(2);
+  });
+
+  test("VOTE01: POST /api/photos/:id/vote returns 404 for an unknown photo id", async () => {
+    const response = await fetch(`${baseUrl}/api/photos/does-not-exist/vote`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.163" },
+    });
+    expect(response.status).toBe(404);
   });
 
 });

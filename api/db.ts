@@ -48,6 +48,9 @@ export interface TraceRecord {
   consent?: number;
   created_at: string;
   deletion_token_hash: string | null;
+  // Votes on the cover photo. The cover has no row of its own in trace_photos
+  // (see TracePhotoRecord), so its vote count lives directly on the trace.
+  photo_vote_count?: number;
 }
 
 export interface TracePhotoRecord {
@@ -55,6 +58,13 @@ export interface TracePhotoRecord {
   trace_id: string;
   path: string;
   position: number;
+  created_at: string;
+  vote_count?: number;
+}
+
+export interface PhotoVoteRecord {
+  photo_id: string;
+  ip_hash: string;
   created_at: string;
 }
 
@@ -181,6 +191,7 @@ let tracesCollection: Collection | null = null;
 let tracePhotosCollection: Collection | null = null;
 let auditLogCollection: Collection | null = null;
 let notifySignupsCollection: Collection | null = null;
+let photoVotesCollection: Collection | null = null;
 
 /**
  * Initialize the database with either SQLite (when mongoUri is unset) or MongoDB.
@@ -207,11 +218,17 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
     await mongoDb.collection("trace_photos").createIndex({ trace_id: 1 });
     await mongoDb.collection("audit_log").createIndex({ created_at: 1 });
     await mongoDb.collection("notify_signups").createIndex({ email: 1 }, { unique: true });
+    // One vote per IP per photo, enforced by the database rather than
+    // application code — see migrations/0002-add-photo-votes.ts.
+    await mongoDb
+      .collection("photo_votes")
+      .createIndex({ photo_id: 1, ip_hash: 1 }, { unique: true });
 
     tracesCollection = mongoDb.collection("traces");
     tracePhotosCollection = mongoDb.collection("trace_photos");
     auditLogCollection = mongoDb.collection("audit_log");
     notifySignupsCollection = mongoDb.collection("notify_signups");
+    photoVotesCollection = mongoDb.collection("photo_votes");
 
     backend = "mongodb";
 
@@ -239,6 +256,7 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
           consent: 1,
           photo: trace.photo,
           photos: [trace.photo],
+          photo_vote_count: 0,
           status: trace.status,
           location: {
             type: "Point",
@@ -283,6 +301,10 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
     if (!traceColumns.some((col) => col.name === "deletion_token_hash")) {
       sqliteDb.exec("ALTER TABLE traces ADD COLUMN deletion_token_hash TEXT");
     }
+    // Add photo_vote_count column if it doesn't exist (votes on the cover photo).
+    if (!traceColumns.some((col) => col.name === "photo_vote_count")) {
+      sqliteDb.exec("ALTER TABLE traces ADD COLUMN photo_vote_count INTEGER NOT NULL DEFAULT 0");
+    }
 
     sqliteDb.exec(`
       CREATE TABLE IF NOT EXISTS audit_log (
@@ -309,6 +331,25 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
         path TEXT NOT NULL,
         position INTEGER NOT NULL,
         created_at TEXT NOT NULL
+      )
+    `);
+
+    // Add vote_count column if it doesn't exist (votes on extra/non-cover photos).
+    const tracePhotoColumns = sqliteDb
+      .query("PRAGMA table_info(trace_photos)")
+      .all() as { name: string }[];
+    if (!tracePhotoColumns.some((col) => col.name === "vote_count")) {
+      sqliteDb.exec("ALTER TABLE trace_photos ADD COLUMN vote_count INTEGER NOT NULL DEFAULT 0");
+    }
+
+    // One vote per IP per photo: the primary key IS the uniqueness constraint,
+    // same role as the Mongo unique index on (photo_id, ip_hash).
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS photo_votes (
+        photo_id TEXT NOT NULL,
+        ip_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (photo_id, ip_hash)
       )
     `);
 
@@ -475,6 +516,7 @@ export async function addTracePhoto(
       path: photoPath,
       position,
       created_at: createdAt,
+      vote_count: 0,
     });
   } else {
     sqliteDb!
@@ -506,12 +548,95 @@ export async function getTracePhotos(traceId: string): Promise<TracePhotoRecord[
       path: doc.path as string,
       position: doc.position as number,
       created_at: doc.created_at as string,
+      vote_count: (doc.vote_count as number) ?? 0,
     }));
   } else {
     const rows = sqliteDb!
       .query("SELECT * FROM trace_photos WHERE trace_id = ? ORDER BY position ASC")
       .all(traceId) as TracePhotoRecord[];
     return rows;
+  }
+}
+
+/**
+ * Cast a vote for a photo from a given (already-hashed) IP.
+ *
+ * photoId is either a trace's id (the cover photo, which has no row of its
+ * own in trace_photos) or a trace_photos.id (an extra photo). Returns null
+ * if photoId matches neither. A repeat vote from the same ip_hash is
+ * idempotent — it does not throw and does not increment the counter again,
+ * because there is no real way to distinguish "the same visitor voting
+ * twice" from "a different visitor behind the same IP" without login.
+ */
+export async function voteForPhoto(
+  photoId: string,
+  ipHash: string,
+  createdAt: string,
+): Promise<{ alreadyVoted: boolean; count: number } | null> {
+  if (backend === "mongodb") {
+    const extraPhoto = await tracePhotosCollection!.findOne({ id: photoId });
+    const isExtra = extraPhoto !== null;
+    if (!isExtra && !(await tracesCollection!.findOne({ id: photoId }))) {
+      return null;
+    }
+    const targetCollection = isExtra ? tracePhotosCollection! : tracesCollection!;
+    const countField = isExtra ? "vote_count" : "photo_vote_count";
+
+    let alreadyVoted = false;
+    try {
+      await photoVotesCollection!.insertOne({ photo_id: photoId, ip_hash: ipHash, created_at: createdAt });
+    } catch (error: unknown) {
+      if (!isMongoDuplicateKeyError(error)) throw error;
+      alreadyVoted = true;
+    }
+
+    if (!alreadyVoted) {
+      await targetCollection.updateOne({ id: photoId }, { $inc: { [countField]: 1 } });
+    }
+
+    const doc = await targetCollection.findOne({ id: photoId });
+    return { alreadyVoted, count: (doc?.[countField] as number) ?? 0 };
+  } else {
+    // bun:sqlite's .get() returns null (not undefined) when no row matches.
+    const extraPhoto = sqliteDb!
+      .query("SELECT id FROM trace_photos WHERE id = ?")
+      .get(photoId) as { id: string } | null;
+    const isExtra = extraPhoto !== null;
+    if (!isExtra) {
+      const trace = sqliteDb!.query("SELECT id FROM traces WHERE id = ?").get(photoId);
+      if (!trace) return null;
+    }
+
+    let alreadyVoted = false;
+    const castVote = sqliteDb!.transaction(() => {
+      const result = sqliteDb!
+        .prepare(
+          "INSERT OR IGNORE INTO photo_votes (photo_id, ip_hash, created_at) VALUES ($photoId, $ipHash, $createdAt)",
+        )
+        .run({ $photoId: photoId, $ipHash: ipHash, $createdAt: createdAt });
+      if (result.changes === 0) {
+        alreadyVoted = true;
+        return;
+      }
+      if (isExtra) {
+        sqliteDb!.prepare("UPDATE trace_photos SET vote_count = vote_count + 1 WHERE id = ?").run(photoId);
+      } else {
+        sqliteDb!.prepare("UPDATE traces SET photo_vote_count = photo_vote_count + 1 WHERE id = ?").run(photoId);
+      }
+    });
+    castVote();
+
+    const countRow = isExtra
+      ? (sqliteDb!.query("SELECT vote_count FROM trace_photos WHERE id = ?").get(photoId) as
+          | { vote_count: number }
+          | undefined)
+      : (sqliteDb!.query("SELECT photo_vote_count FROM traces WHERE id = ?").get(photoId) as
+          | { photo_vote_count: number }
+          | undefined);
+    const count = isExtra
+      ? (countRow as { vote_count: number } | undefined)?.vote_count ?? 0
+      : (countRow as { photo_vote_count: number } | undefined)?.photo_vote_count ?? 0;
+    return { alreadyVoted, count };
   }
 }
 
@@ -646,6 +771,18 @@ export async function getAuditLogs(limit: number = 50): Promise<AuditLogRecord[]
 /**
  * Add a newsletter signup.
  */
+// MongoDB duplicate key error code is 11000 — thrown when an insertOne hits a
+// unique index (notify_signups.email, photo_votes' (photo_id, ip_hash) pair).
+function isMongoDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "number" &&
+    (error as { code: number }).code === 11000
+  );
+}
+
 export async function addNotifySignup(
   id: string,
   email: string,
@@ -662,14 +799,7 @@ export async function addNotifySignup(
         created_at: createdAt,
       });
     } catch (error: unknown) {
-      // MongoDB duplicate key error code is 11000
-      const isDuplicateKey =
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        typeof error.code === "number" &&
-        error.code === 11000;
-      if (!isDuplicateKey) {
+      if (!isMongoDuplicateKeyError(error)) {
         throw error;
       }
       // Duplicate email — silently ignore to match INSERT OR IGNORE behavior
@@ -701,6 +831,7 @@ export async function closeDatabase(): Promise<void> {
     tracePhotosCollection = null;
     auditLogCollection = null;
     notifySignupsCollection = null;
+    photoVotesCollection = null;
   }
 
   if (sqliteDb) {
@@ -729,6 +860,7 @@ export function traceToMongoDoc(trace: TraceRecord): Record<string, unknown> {
     consent: trace.consent ?? 0,
     photo: trace.photo,
     photos: [trace.photo],
+    photo_vote_count: trace.photo_vote_count ?? 0,
     status: trace.status,
     location: {
       type: "Point",
@@ -761,6 +893,7 @@ export function mongoDocToTrace(doc: Record<string, unknown>): TraceRecord {
     consent: doc.consent as number | undefined,
     created_at: doc.created_at as string,
     deletion_token_hash: (doc.deletion_token_hash ?? null) as string | null,
+    photo_vote_count: (doc.photo_vote_count as number | undefined) ?? 0,
   };
 }
 

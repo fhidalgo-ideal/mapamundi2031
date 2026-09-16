@@ -15,6 +15,7 @@ let archiveVisibleCount = ARCHIVE_BATCH_SIZE;
 let activeFilter = "all";
 let selectedTraceId = null;
 let storyPhotos = [];
+let currentStoryPhotoId = null;
 
 const worldMapEl = document.querySelector("#worldMap");
 const form = document.querySelector("#traceForm");
@@ -22,6 +23,8 @@ const archiveGrid = document.querySelector("#archiveGrid");
 const archiveLoadMoreButton = document.querySelector("#archiveLoadMore");
 const storyPanel = document.querySelector("#storyPanel");
 const storyThumbs = document.querySelector("#storyThumbs");
+const storyVoteButton = document.querySelector("#storyVoteButton");
+const storyVoteCount = document.querySelector("#storyVoteCount");
 const zoomInButton = document.querySelector("#zoomIn");
 const zoomOutButton = document.querySelector("#zoomOut");
 const zoomResetButton = document.querySelector("#zoomReset");
@@ -221,13 +224,13 @@ function renderStoryThumbs() {
     return;
   }
   storyThumbs.classList.remove("hidden");
-  storyPhotos.forEach((photoUrl, index) => {
+  storyPhotos.forEach((photo, index) => {
     const thumbButton = document.createElement("button");
     thumbButton.type = "button";
     thumbButton.className = "story-thumb";
     thumbButton.setAttribute("aria-label", `Foto ${index + 1} de ${storyPhotos.length}`);
     const thumbImage = document.createElement("img");
-    thumbImage.src = photoUrl;
+    thumbImage.src = photo.url;
     thumbImage.alt = "";
     thumbButton.appendChild(thumbImage);
     thumbButton.addEventListener("click", () => setStoryPhoto(index));
@@ -235,18 +238,48 @@ function renderStoryThumbs() {
   });
 }
 
+function renderStoryVote(photo) {
+  if (!storyVoteButton || !storyVoteCount) return;
+  storyVoteButton.disabled = false;
+  storyVoteButton.classList.remove("is-voted");
+  storyVoteButton.textContent = "Votar esta foto";
+  storyVoteCount.textContent = photo.voteCount;
+}
+
 function setStoryPhoto(index) {
-  const photoUrl = storyPhotos[index];
-  if (!photoUrl) return;
-  document.querySelector("#storyImage").src = photoUrl;
+  const photo = storyPhotos[index];
+  if (!photo) return;
+  currentStoryPhotoId = photo.id;
+  document.querySelector("#storyImage").src = photo.url;
   storyThumbs.querySelectorAll(".story-thumb").forEach((thumbButton, thumbIndex) => {
     thumbButton.classList.toggle("is-active", thumbIndex === index);
   });
+  renderStoryVote(photo);
 }
+
+async function castStoryVote() {
+  if (!currentStoryPhotoId || !storyVoteButton) return;
+  storyVoteButton.disabled = true;
+  try {
+    const payload = await apiRequest(`/photos/${encodeURIComponent(currentStoryPhotoId)}/vote`, {
+      method: "POST",
+    });
+    storyVoteCount.textContent = payload.count;
+    storyVoteButton.textContent = payload.alreadyVoted ? "Ya has votado" : "Voto registrado";
+    storyVoteButton.classList.add("is-voted");
+    const voted = storyPhotos.find((photo) => photo.id === currentStoryPhotoId);
+    if (voted) voted.voteCount = payload.count;
+  } catch (error) {
+    storyVoteButton.disabled = false;
+    storyVoteButton.textContent = "No se pudo votar. Reintentar";
+  }
+}
+
+storyVoteButton?.addEventListener("click", castStoryVote);
 
 function openStory(trace) {
   selectedTraceId = trace.id;
-  storyPhotos = trace.photos && trace.photos.length ? trace.photos : [trace.photo];
+  storyPhotos = trace.photos && trace.photos.length ? trace.photos : [{ id: trace.id, url: trace.photo, voteCount: 0 }];
   renderStoryThumbs();
   setStoryPhoto(0);
   document.querySelector("#storyImage").alt = `Fotografia subida por ${trace.name}`;
