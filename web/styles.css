@@ -2068,3 +2068,121 @@ body.modal-open {
     min-height: auto;
   }
 }
+
+.cookie-banner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  max-width: 640px;
+  margin: 0 auto;
+  /* Above .modal-overlay/.story-panel (2000) so it's never covered. */
+  z-index: 2500;
+  background: rgba(13, 19, 31, 0.97);
+  color: var(--ink-on-dark);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cookie-banner.hidden {
+  display: none !important;
+}
+
+.cookie-banner__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: var(--lh-normal);
+  color: var(--ink-on-dark);
+}
+
+.cookie-banner__links {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.cookie-banner__links a {
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  text-decoration: underline;
+}
+
+.cookie-banner__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cookie-banner__actions .button {
+  min-height: 40px;
+}
+
+.cookie-tab {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2500;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--coral);
+  color: var(--ink-on-dark);
+  font-size: 22px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.cookie-tab.hidden {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .cookie-banner {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    padding: 18px;
+  }
+  .cookie-banner__actions {
+    flex-direction: column-reverse;
+  }
+  .cookie-banner__actions .button {
+    width: 100%;
+  }
+}
+
+.cookie-denied-page {
+  align-items: center;
+  background: var(--bg);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
+
+.cookie-denied-page h1 {
+  font-size: 28px;
+  margin: 0;
+}
+
+.cookie-denied-page p {
+  color: var(--muted);
+  margin: 0;
+  max-width: 480px;
+}
