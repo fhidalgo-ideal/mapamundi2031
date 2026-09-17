@@ -363,7 +363,7 @@ function renderArchive() {
   const approved = approvedTraces().slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   if (approved.length === 0) {
-    archiveGrid.innerHTML = `<p class="empty-state">Todavia no hay luces aprobadas.</p>`;
+    archiveGrid.innerHTML = `<p class="empty-state">Todavía no hay luces aprobadas.</p>`;
     archiveLoadMoreButton.classList.add("hidden");
     return;
   }
