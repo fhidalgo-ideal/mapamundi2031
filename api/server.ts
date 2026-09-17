@@ -71,26 +71,26 @@ const VALID_EMOTIONS = new Set(["nostalgia", "pertenencia", "asombro", "futuro"]
 const VALID_STATUSES = new Set(["pending", "approved", "rejected"]);
 
 const DEFAULT_PUBLIC_CONFIG = {
-  site_title: "Granada 2031 | Geolocalizacion del Sentimiento",
+  site_title: "Granada 2031 | Geolocalización del Sentimiento",
   brand_name: "Granada 2031",
-  brand_subtitle: "Geolocalizacion del Sentimiento",
+  brand_subtitle: "Geolocalización del Sentimiento",
   brand_logo: "",
   brand_logo_alt: "Granada 2031",
   hero_eyebrow: "Candidatura cultural participativa",
   hero_title: "Granada encendida en el mundo",
   hero_text:
-    "Cada foto compartida abre una luz: un recuerdo, una huella o una emocion que conecta a Granada con otra ciudad del planeta.",
+    "Cada foto compartida abre una luz: un recuerdo, una huella o una emoción que conecta a Granada con otra ciudad del planeta.",
   submit_cta: "Subir un rastro",
-  latest_cta: "Ver ultima luz",
+  latest_cta: "Ver última luz",
   map_title: "Mapa vivo",
   map_hint: "Rueda para acercar, arrastra para moverte y haz clic en una luz.",
-  submit_eyebrow: "Nueva contribucion",
+  submit_eyebrow: "Nueva contribución",
   submit_title: "Sube tu rastro de Granada",
   archive_eyebrow: "Historias publicadas",
   archive_title: "Archivo de luces",
-  consent_text: "Acepto que esta fotografia y el texto se usen en la accion cultural Granada 2031.",
-  footer_text: "Granada 2031. Geolocalizacion del Sentimiento.",
-  privacy_label: "Politica de privacidad",
+  consent_text: "Acepto que esta fotografía y el texto se usen en la acción cultural Granada 2031.",
+  footer_text: "Granada 2031. Geolocalización del Sentimiento.",
+  privacy_label: "Política de privacidad",
   privacy_url: "/politica-de-privacidad",
   legal_label: "Aviso legal",
   legal_url: "/aviso-legal",
@@ -98,8 +98,8 @@ const DEFAULT_PUBLIC_CONFIG = {
   ideal_logo_alt: "IDEAL",
   ideal_url: "https://www.ideal.es",
   legal_deletion_contact: "privacy@granada2031.es",
-  legal_deletion_note: "Guarde el codigo de eliminacion que se le proporcionara tras enviar. Puede usarlo para borrar su contribucion en cualquier momento.",
-  legal_data_retention: "Los datos personales se conservan mientras la contribucion permanezca publicada. Puede eliminarla en cualquier momento usando su codigo de eliminacion.",
+  legal_deletion_note: "Guarde el código de eliminación que se le proporcionará tras enviar. Puede usarlo para borrar su contribución en cualquier momento.",
+  legal_data_retention: "Los datos personales se conservan mientras la contribución permanezca publicada. Puede eliminarla en cualquier momento usando su código de eliminación.",
 };
 
 const CITY_COORDINATES: Record<string, [number, number]> = {
@@ -728,7 +728,7 @@ function requireAdmin(request: Request): Response | null {
   const prefix = "Bearer ";
   const token = authorization.startsWith(prefix) ? authorization.slice(prefix.length) : null;
   if (!validAdminToken(token)) {
-    return errorResponse("Acceso de administracion no autorizado.", 401);
+    return errorResponse("Acceso de administración no autorizado.", 401);
   }
   return null;
 }
@@ -759,7 +759,7 @@ async function handleGeocodeSearch(
   const clientIp = getClientIp(request, server);
   const rateLimit = checkGeocodeSearchRateLimit(clientIp);
   if (rateLimit.limited) {
-    const response = errorResponse("Demasiadas busquedas. Intentalo en unos minutos.", 429);
+    const response = errorResponse("Demasiadas búsquedas. Inténtalo en unos minutos.", 429);
     response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
     return response;
   }
@@ -788,7 +788,7 @@ async function recordAuditLog(action: string, traceId: string | null, sourceIp: 
   try {
     await addAuditLog(randomUUID(), action, traceId, sourceIp, nowIso());
   } catch (error) {
-    console.error("No se pudo registrar la entrada de auditoria:", error);
+    console.error("No se pudo registrar la entrada de auditoría:", error);
   }
 }
 
@@ -863,7 +863,7 @@ async function handleAdminLogin(request: Request, server?: IpResolvingServer): P
   const lockout = adminLoginLockout.check(clientIp);
   if (lockout.limited) {
     const response = errorResponse(
-      "Demasiados intentos fallidos de inicio de sesion. Intentalo mas tarde.",
+      "Demasiados intentos fallidos de inicio de sesión. Inténtalo más tarde.",
       429,
     );
     response.headers.set("Retry-After", String(lockout.retryAfterSeconds));
@@ -873,7 +873,7 @@ async function handleAdminLogin(request: Request, server?: IpResolvingServer): P
   try {
     payload = await request.json();
   } catch {
-    return errorResponse("JSON no valido.");
+    return errorResponse("JSON no válido.");
   }
   const password = String(payload.password ?? "");
   const config = loadConfig();
@@ -885,7 +885,7 @@ async function handleAdminLogin(request: Request, server?: IpResolvingServer): P
   if (!matches) {
     adminLoginLockout.recordFailure(clientIp);
     recordAuditLog("login_failure", null, clientIp);
-    return errorResponse("Password de administracion incorrecta.", 401);
+    return errorResponse("Password de administración incorrecta.", 401);
   }
   recordAuditLog("login_success", null, clientIp);
   return jsonResponse({ token: makeAdminToken(), expiresIn: ADMIN_TOKEN_TTL_SECONDS });
@@ -998,7 +998,7 @@ async function handleVotePhoto(
   const clientIp = getClientIp(request, server);
   const rateLimit = checkVoteRateLimit(clientIp);
   if (rateLimit.limited) {
-    const response = errorResponse("Demasiados votos desde esta conexion. Intentalo mas tarde.", 429);
+    const response = errorResponse("Demasiados votos desde esta conexión. Inténtalo más tarde.", 429);
     response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
     return response;
   }
@@ -1007,7 +1007,7 @@ async function handleVotePhoto(
   const ipHash = hashPhotoVoteIp(clientIp, pepper);
   const result = await voteForPhoto(photoId, ipHash, nowIso());
   if (!result) {
-    return errorResponse("No existe esa fotografia.", 404);
+    return errorResponse("No existe esa fotografía.", 404);
   }
   return jsonResponse({ voted: true, alreadyVoted: result.alreadyVoted, count: result.count });
 }
@@ -1042,7 +1042,7 @@ function createFailureLockout(maxFailures: number, windowMs: number) {
 
 const adminLoginLockout = createFailureLockout(ADMIN_LOGIN_LOCKOUT_MAX, ADMIN_LOGIN_LOCKOUT_WINDOW_MS);
 
-const GENERIC_SUBMISSION_ERROR = "No se ha podido procesar tu contribucion. Intentalo de nuevo mas tarde.";
+const GENERIC_SUBMISSION_ERROR = "No se ha podido procesar tu contribución. Inténtalo de nuevo más tarde.";
 
 // Runs one uploaded file through the full validation/sanitization pipeline used
 // for contribution photos: size cap, Content-Type allowlist, binary signature
@@ -1054,7 +1054,7 @@ async function validateAndSanitizePhoto(
   photo: File,
 ): Promise<{ sanitized: Uint8Array; extension: string } | { error: Response }> {
   if (photo.size > MAX_UPLOAD_BYTES) {
-    return { error: errorResponse("La fotografia supera el limite de 8 MB.", 413) };
+    return { error: errorResponse("La fotografía supera el límite de 8 MB.", 413) };
   }
   if (!ALLOWED_IMAGE_TYPES[photo.type]) {
     return { error: errorResponse("Formato no permitido. Usa JPG, PNG o WEBP.") };
@@ -1064,19 +1064,19 @@ async function validateAndSanitizePhoto(
   const headerBytes = new Uint8Array(await photo.arrayBuffer());
   const sniffedType = sniffImageSignature(headerBytes);
   if (!sniffedType) {
-    return { error: errorResponse("La fotografia no tiene un formato valido (JPG, PNG o WEBP).") };
+    return { error: errorResponse("La fotografía no tiene un formato válido (JPG, PNG o WEBP).") };
   }
 
   // Anti decompression-bomb: read intrinsic dimensions from the header only
   // (no full pixel decode) and reject oversized canvases before persisting.
   const [imgWidth, imgHeight] = readImageDimensions(headerBytes, sniffedType);
   if (imgWidth <= 0 || imgHeight <= 0) {
-    return { error: errorResponse("No se pudieron leer las dimensiones de la fotografia.") };
+    return { error: errorResponse("No se pudieron leer las dimensiones de la fotografía.") };
   }
   if (imgWidth > MAX_IMAGE_DIMENSION || imgHeight > MAX_IMAGE_DIMENSION) {
     return {
       error: errorResponse(
-        `La fotografia excede el tamano maximo de ${MAX_IMAGE_DIMENSION}x${MAX_IMAGE_DIMENSION} px.`,
+        `La fotografía excede el tamano máximo de ${MAX_IMAGE_DIMENSION}x${MAX_IMAGE_DIMENSION} px.`,
         413,
       ),
     };
@@ -1095,7 +1095,7 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   const rateLimit = checkTraceRateLimit(clientIp);
   if (rateLimit.limited) {
     const response = errorResponse(
-      "Demasiadas contribuciones enviadas desde esta conexion. Intentalo mas tarde.",
+      "Demasiadas contribuciones enviadas desde esta conexión. Intentalo más tarde.",
       429,
     );
     response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
@@ -1107,7 +1107,7 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   // carry up to MAX_PHOTOS files; each individual file is still capped at
   // MAX_UPLOAD_BYTES by the per-file validation below.
   if (contentLength > MAX_PHOTOS * MAX_UPLOAD_BYTES) {
-    return errorResponse("La contribucion supera el limite de tamano permitido.", 413);
+    return errorResponse("La contribución supera el límite de tamaño permitido.", 413);
   }
   const contentType = request.headers.get("Content-Type") ?? "";
   if (!contentType.includes("multipart/form-data")) {
@@ -1118,7 +1118,7 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   try {
     form = await request.formData();
   } catch {
-    return errorResponse("La peticion no contiene datos.");
+    return errorResponse("La petición no contiene datos.");
   }
 
   const honeypot = String(form.get("website") ?? "").trim();
@@ -1137,7 +1137,7 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
   }
 
   if (!VALID_EMOTIONS.has(values.emotion)) {
-    return errorResponse("La emocion indicada no es valida.");
+    return errorResponse("La emoción indicada no es válida.");
   }
 
   const consentTruthy = ["true", "on", "1"].includes(values.consent.toLowerCase());
@@ -1149,10 +1149,10 @@ async function handleCreateTrace(request: Request, server?: IpResolvingServer): 
     .getAll("photo")
     .filter((entry): entry is File => entry instanceof File && entry.name.length > 0);
   if (photoFiles.length === 0) {
-    return errorResponse("Falta la fotografia.");
+    return errorResponse("Falta la fotografía.");
   }
   if (photoFiles.length > MAX_PHOTOS) {
-    return errorResponse(`Puedes adjuntar como maximo ${MAX_PHOTOS} fotografias.`);
+    return errorResponse(`Puedes adjuntar como máximo ${MAX_PHOTOS} fotografías.`);
   }
 
   // Validate/sanitize EVERY file up front through the same pipeline as a single
@@ -1249,7 +1249,7 @@ async function handleNotifySignup(request: Request, server?: IpResolvingServer):
   const rateLimit = checkNotifySignupRateLimit(clientIp);
   if (rateLimit.limited) {
     const response = errorResponse(
-      "Demasiadas suscripciones desde esta conexion. Intentalo mas tarde.",
+      "Demasiadas suscripciones desde esta conexión. Inténtalo más tarde.",
       429,
     );
     response.headers.set("Retry-After", String(rateLimit.retryAfterSeconds));
@@ -1260,12 +1260,12 @@ async function handleNotifySignup(request: Request, server?: IpResolvingServer):
   try {
     payload = await request.json();
   } catch {
-    return errorResponse("La peticion no contiene un cuerpo JSON valido.");
+    return errorResponse("La petición no contiene un cuerpo JSON válido.");
   }
 
   const email = typeof payload.email === "string" ? payload.email.trim() : "";
   if (!email || email.length > 180 || !EMAIL_PATTERN.test(email)) {
-    return errorResponse("Introduce un correo electronico valido.");
+    return errorResponse("Introduce un correo electrónico válido.");
   }
   // Idempotent capture: addNotifySignup uses INSERT OR IGNORE (SQLite) or catches
   // duplicate key errors (Mongo), so re-submitting the same email returns 201.
@@ -1283,15 +1283,15 @@ async function handleUpdateStatus(request: Request, traceId: string, server?: Ip
   }
   const status = payload.status;
   if (typeof status !== "string" || !VALID_STATUSES.has(status)) {
-    return errorResponse("Estado no valido.");
+    return errorResponse("Estado no válido.");
   }
   const updated = await updateTraceStatus(traceId, status);
   if (!updated) {
-    return errorResponse("No existe esa contribucion.", 404);
+    return errorResponse("No existe esa contribución.", 404);
   }
   const trace = await getTraceById(traceId);
   if (!trace) {
-    return errorResponse("No existe esa contribucion.", 404);
+    return errorResponse("No existe esa contribución.", 404);
   }
   await recordAuditLog("update_status", traceId, getClientIp(request, server));
   const publicTrace = await dbTraceToPublic(trace);
@@ -1303,7 +1303,7 @@ async function handleUpdateTrace(request: Request, traceId: string, server?: IpR
   try {
     payload = await request.json();
   } catch {
-    return errorResponse("JSON no valido.");
+    return errorResponse("JSON no válido.");
   }
 
   const allowed: Record<string, number> = {
@@ -1314,7 +1314,7 @@ async function handleUpdateTrace(request: Request, traceId: string, server?: IpR
     if (field in payload) {
       const value = String(payload[field]).trim().slice(0, maxLength);
       if (!value) {
-        return errorResponse(`El campo ${field} no puede estar vacio.`);
+        return errorResponse(`El campo ${field} no puede estar vacío.`);
       }
       updates[field] = value;
     }
@@ -1326,11 +1326,11 @@ async function handleUpdateTrace(request: Request, traceId: string, server?: IpR
 
   const updated = await updateTrace(traceId, updates);
   if (!updated) {
-    return errorResponse("No existe esa contribucion.", 404);
+    return errorResponse("No existe esa contribución.", 404);
   }
   const trace = await getTraceById(traceId);
   if (!trace) {
-    return errorResponse("No existe esa contribucion.", 404);
+    return errorResponse("No existe esa contribución.", 404);
   }
   await recordAuditLog("update_trace", traceId, getClientIp(request, server));
   const publicTrace = await dbTraceToPublic(trace);
@@ -1370,7 +1370,7 @@ async function deleteTraceRow(traceId: string): Promise<void> {
 async function handleDeleteTrace(request: Request, traceId: string, server?: IpResolvingServer): Promise<Response> {
   const trace = await getTraceById(traceId);
   if (!trace) {
-    return errorResponse("No existe esa contribucion.", 404);
+    return errorResponse("No existe esa contribución.", 404);
   }
   await deleteTraceRow(traceId);
   await recordAuditLog("delete_trace", traceId, getClientIp(request, server));
@@ -1385,16 +1385,16 @@ async function handleDeleteTrace(request: Request, traceId: string, server?: IpR
 async function handleSelfDeleteTrace(request: Request, traceId: string): Promise<Response> {
   const trace = await getTraceById(traceId);
   if (!trace) {
-    return errorResponse("No existe esa contribucion.", 404);
+    return errorResponse("No existe esa contribución.", 404);
   }
   const providedToken = request.headers.get("X-Deletion-Token") ?? "";
   if (!providedToken || !trace.deletion_token_hash) {
-    return errorResponse("Token de borrado no valido.", 403);
+    return errorResponse("Token de borrado no válido.", 403);
   }
   const provided = Buffer.from(hashDeletionToken(providedToken), "utf-8");
   const stored = Buffer.from(trace.deletion_token_hash, "utf-8");
   if (provided.length !== stored.length || !timingSafeEqual(provided, stored)) {
-    return errorResponse("Token de borrado no valido.", 403);
+    return errorResponse("Token de borrado no válido.", 403);
   }
   await deleteTraceRow(traceId);
   return jsonResponse({ deleted: true, id: traceId });
@@ -1522,7 +1522,7 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
     }
     if (normalizedPath === "/api/admin/login") {
       return errorResponse(
-        "El login de administracion debe hacerse desde la web, no abriendo esta URL directamente.",
+        "El login de administración debe hacerse desde la web, no abriendo esta URL directamente.",
         405,
       );
     }
