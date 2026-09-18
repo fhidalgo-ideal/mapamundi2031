@@ -2174,7 +2174,7 @@ body.modal-open {
 }
 
 .cookie-banner__links a {
-  color: var(--gold);
+  color: #bc622a;
   font-size: 13px;
   font-weight: var(--fw-semibold);
   text-decoration: underline;
@@ -2190,6 +2190,11 @@ body.modal-open {
   min-height: 40px;
 }
 
+.cookie-banner__actions .button.primary {
+  background: #bc622a;
+  color: var(--ink-on-dark);
+}
+
 .cookie-tab {
   position: fixed;
   left: 16px;
@@ -2199,7 +2204,7 @@ body.modal-open {
   height: 48px;
   border-radius: 50%;
   border: 1px solid var(--line);
-  background: var(--coral);
+  background: #bc622a;
   color: var(--ink-on-dark);
   font-size: 22px;
   line-height: 1;
