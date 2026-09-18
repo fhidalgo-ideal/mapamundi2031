@@ -1419,6 +1419,32 @@ textarea {
   color: var(--coral);
 }
 
+.trace-card-vote {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.trace-card-vote .button {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+/* .outline repeated to outrank .button.outline:hover (same specificity
+   otherwise): without it, hovering a just-voted button showed the plain
+   hover tint instead of staying coral. */
+.trace-card-vote .button.outline.is-voted {
+  background: var(--coral);
+  border-color: var(--coral);
+  color: var(--ink-on-dark);
+}
+
+.trace-card-vote__count {
+  color: var(--muted-on-light);
+  font-size: 13px;
+}
+
 .trace-card .emotion.nostalgia {
   background: rgba(242, 109, 91, 0.14);
   color: #b23a2c;

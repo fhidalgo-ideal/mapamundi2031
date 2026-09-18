@@ -17,6 +17,13 @@ let selectedTraceId = null;
 let storyPhotos = [];
 let currentStoryPhotoId = null;
 
+// Photo ids voted in this session — from either the map story panel or an
+// archive card's own "Votar esta foto" button. Voting is still enforced
+// server-side (one vote per IP per photo, see POST /api/photos/:id/vote);
+// this only keeps whichever UI is showing a given photo in sync so it
+// doesn't invite a second, redundant vote attempt on the same photo.
+const votedPhotoIds = new Set();
+
 const worldMapEl = document.querySelector("#worldMap");
 const form = document.querySelector("#traceForm");
 const archiveGrid = document.querySelector("#archiveGrid");
@@ -238,12 +245,50 @@ function renderStoryThumbs() {
   });
 }
 
+function applyVotedState(button, countEl, voteCount) {
+  if (!button) return;
+  button.disabled = true;
+  button.classList.add("is-voted");
+  button.textContent = "Ya has votado";
+  if (countEl) countEl.textContent = voteCount;
+}
+
+function applyUnvotedState(button, countEl, voteCount) {
+  if (!button) return;
+  button.disabled = false;
+  button.classList.remove("is-voted");
+  button.textContent = "Votar esta foto";
+  if (countEl) countEl.textContent = voteCount;
+}
+
+// Shared by the map story panel's vote button and each archive card's own
+// vote button: same endpoint, same photo id, so a photo already voted from
+// one place is answered idempotently (not double-counted) from the other.
+async function castVote(photoId, button, countEl, onVoted) {
+  if (!photoId || !button) return;
+  button.disabled = true;
+  try {
+    const payload = await apiRequest(`/photos/${encodeURIComponent(photoId)}/vote`, {
+      method: "POST",
+    });
+    votedPhotoIds.add(photoId);
+    if (countEl) countEl.textContent = payload.count;
+    button.textContent = payload.alreadyVoted ? "Ya has votado" : "Voto registrado";
+    button.classList.add("is-voted");
+    onVoted?.(payload.count);
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "No se pudo votar. Reintentar";
+  }
+}
+
 function renderStoryVote(photo) {
   if (!storyVoteButton || !storyVoteCount) return;
-  storyVoteButton.disabled = false;
-  storyVoteButton.classList.remove("is-voted");
-  storyVoteButton.textContent = "Votar esta foto";
-  storyVoteCount.textContent = photo.voteCount;
+  if (votedPhotoIds.has(photo.id)) {
+    applyVotedState(storyVoteButton, storyVoteCount, photo.voteCount);
+  } else {
+    applyUnvotedState(storyVoteButton, storyVoteCount, photo.voteCount);
+  }
 }
 
 function setStoryPhoto(index) {
@@ -258,21 +303,11 @@ function setStoryPhoto(index) {
 }
 
 async function castStoryVote() {
-  if (!currentStoryPhotoId || !storyVoteButton) return;
-  storyVoteButton.disabled = true;
-  try {
-    const payload = await apiRequest(`/photos/${encodeURIComponent(currentStoryPhotoId)}/vote`, {
-      method: "POST",
-    });
-    storyVoteCount.textContent = payload.count;
-    storyVoteButton.textContent = payload.alreadyVoted ? "Ya has votado" : "Voto registrado";
-    storyVoteButton.classList.add("is-voted");
+  if (!currentStoryPhotoId) return;
+  await castVote(currentStoryPhotoId, storyVoteButton, storyVoteCount, (count) => {
     const voted = storyPhotos.find((photo) => photo.id === currentStoryPhotoId);
-    if (voted) voted.voteCount = payload.count;
-  } catch (error) {
-    storyVoteButton.disabled = false;
-    storyVoteButton.textContent = "No se pudo votar. Reintentar";
-  }
+    if (voted) voted.voteCount = count;
+  });
 }
 
 storyVoteButton?.addEventListener("click", castStoryVote);
@@ -379,7 +414,25 @@ function renderArchive() {
     node.querySelector("h3").textContent = `${trace.city}, ${trace.country}`;
     node.querySelector("p").textContent = trace.feeling;
     article.style.setProperty("--tilt", `${polaroidTilt(index)}deg`);
-    node.querySelector("button").addEventListener("click", () => {
+
+    // The cover photo is photos[0] (see dbTraceToPublic): its id is what
+    // POST /api/photos/:id/vote expects, and it's the same id voting from
+    // the map story panel for this same photo would use.
+    const coverPhoto = (trace.photos && trace.photos[0]) || { id: trace.id, voteCount: 0 };
+    const voteButton = node.querySelector("[data-vote-button]");
+    const voteCount = node.querySelector("[data-vote-count]");
+    if (votedPhotoIds.has(coverPhoto.id)) {
+      applyVotedState(voteButton, voteCount, coverPhoto.voteCount);
+    } else {
+      applyUnvotedState(voteButton, voteCount, coverPhoto.voteCount);
+    }
+    voteButton.addEventListener("click", () => {
+      castVote(coverPhoto.id, voteButton, voteCount, (count) => {
+        coverPhoto.voteCount = count;
+      });
+    });
+
+    node.querySelector("[data-open-map]").addEventListener("click", () => {
       document.querySelector(".map-section")?.scrollIntoView({ behavior: "smooth" });
       openStory(trace);
     });
