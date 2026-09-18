@@ -929,14 +929,19 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
-  display: grid;
-  grid-template-rows: 220px auto 1fr;
-  max-height: calc(100vh - 44px);
+  display: flex;
+  flex-direction: column;
+  /* Bottom edge stays a 22px gap below the panel's own top offset, matching
+     the fixed left/right gap, so the card never runs off the viewport. */
+  max-height: calc(100vh - 380px - 22px);
   max-width: 420px;
   overflow-y: auto;
   position: fixed;
   right: 22px;
-  top: 92px;
+  /* Lines up with the bottom of the emotion filter chips (.map-toolbar),
+     not the top of the map card, so the panel reads as paired with the map
+     canvas instead of overlapping the section heading/toolbar above it. */
+  top: 380px;
   width: min(420px, calc(100vw - 44px));
   /* Same fix as .modal-overlay: must beat the map's own stacked UI
      (.map-controls/.map-hint at 1000, Leaflet's panes up to 700) or the
@@ -953,9 +958,20 @@ h2 {
 }
 
 .story-panel > img {
-  height: 220px;
+  aspect-ratio: 4 / 5;
+  /* Exactly the same crop as the gallery (.trace-card img) — never shrunk
+     or capped to save space. If the card doesn't fit under the viewport,
+     the panel scrolls (overflow-y: auto below); the photo itself is never
+     altered to make room. */
+  flex: 0 0 auto;
   object-fit: cover;
   width: 100%;
+}
+
+.story-thumbs,
+.story-vote,
+.story-body {
+  flex-shrink: 0;
 }
 
 .story-thumbs {
@@ -1024,7 +1040,30 @@ h2 {
 }
 
 .story-body {
-  padding: 18px;
+  padding: 14px 18px 18px;
+}
+
+/* Tighter than the base blockquote/dl rules below: the panel now starts
+   lower (right after the map's filter chips), leaving less headroom before
+   the card would need to scroll to show its own vote button and data. */
+.story-body h3 {
+  margin: 0 0 6px;
+}
+
+.story-body > p {
+  margin: 0 0 10px;
+}
+
+.story-body blockquote {
+  margin: 10px 0;
+}
+
+.story-body dl {
+  /* Vinculo/Fecha side by side instead of stacked: saves a whole row of
+     height, which matters now that the panel sits lower with less room. */
+  gap: 8px 16px;
+  grid-template-columns: 1fr 1fr;
+  margin: 10px 0 0;
 }
 
 .emotion {
@@ -1941,17 +1980,12 @@ textarea {
 
   .story-panel {
     bottom: 12px;
-    grid-template-rows: 150px auto 1fr;
     left: 12px;
     max-height: min(78vh, 560px);
     max-width: none;
     right: 12px;
     top: auto;
     width: auto;
-  }
-
-  .story-panel > img {
-    height: 150px;
   }
 
   .trace-form,

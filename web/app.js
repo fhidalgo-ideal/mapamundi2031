@@ -380,7 +380,7 @@ function renderArchive() {
     node.querySelector("p").textContent = trace.feeling;
     article.style.setProperty("--tilt", `${polaroidTilt(index)}deg`);
     node.querySelector("button").addEventListener("click", () => {
-      document.querySelector("#mapa").scrollIntoView({ behavior: "smooth" });
+      document.querySelector(".map-section")?.scrollIntoView({ behavior: "smooth" });
       openStory(trace);
     });
     archiveGrid.appendChild(node);
