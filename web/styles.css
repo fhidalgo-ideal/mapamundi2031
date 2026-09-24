@@ -331,7 +331,12 @@ nav a:hover {
 
 .hero {
   align-items: center;
-  background: var(--bg-light);
+  /* Cream veil over the photo keeps the hero's dark-on-cream text colours
+     legible without restyling them. */
+  background:
+    linear-gradient(rgba(250, 246, 238, 0.82), rgba(250, 246, 238, 0.92)),
+    url("assets/hero-alhambra.webp") center 45% / cover no-repeat,
+    var(--bg-light);
   display: flex;
   justify-content: center;
   min-height: 92vh;
@@ -2100,8 +2105,21 @@ textarea {
   margin-bottom: 44px;
 }
 
+.hero-actions .button {
+  gap: 10px;
+  letter-spacing: 0.06em;
+  min-height: 52px;
+  padding: 0 24px;
+  text-transform: uppercase;
+}
+
+.hero-actions .button-icon {
+  flex-shrink: 0;
+}
+
 .hero-actions .button.primary {
-  background: var(--coral);
+  background: #bc622a;
+  border: 1.5px solid #bc622a;
   color: var(--bg-light);
 }
 
@@ -2111,12 +2129,64 @@ textarea {
 
 .hero-actions .button.ghost {
   background: transparent;
-  border: 1.5px solid var(--line-light);
-  color: var(--ink-on-light);
+  border: 1.5px solid #bc622a;
+  color: #bc622a;
 }
 
 .hero-actions .button.ghost:hover {
-  background: rgba(26, 26, 26, 0.05);
+  background: rgba(188, 98, 42, 0.08);
+}
+
+/* Discreet variant of .eyebrow: no pill, just spaced coral text above the
+   wordmark. */
+.hero-copy .hero-eyebrow {
+  background: none;
+  border-radius: 0;
+  color: #bc622a;
+  /* The shared --ls-wide (5px) pushes this long line onto two rows on
+     desktop. */
+  letter-spacing: 0.16em;
+  margin: 0 0 18px;
+  padding: 0;
+}
+
+/* When the line doesn't fit (mobile) it can only break between the two
+   halves, never mid-phrase. */
+.hero-eyebrow span {
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .hero-copy .hero-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+
+  /* Fits "ENCENDER MI PUNTO DE LUZ" on one line from ~360px up; below
+     that it wraps onto two balanced lines. */
+  .hero-actions .button {
+    font-size: 14px;
+    letter-spacing: 0.03em;
+    padding: 0 16px;
+  }
+
+  .hero-actions .button span {
+    text-wrap: balance;
+  }
+}
+
+/* p.hero-tagline (not just .hero-tagline) to outrank
+   `.hero-copy p:not(.eyebrow)`, which would otherwise restyle it as the lead
+   paragraph. */
+.hero-copy p.hero-tagline {
+  border-top: 1px solid var(--line-light);
+  color: var(--muted-on-light);
+  font-size: 16px;
+  font-style: italic;
+  line-height: 1.5;
+  margin: 36px auto 0;
+  max-width: 460px;
+  padding-top: 22px;
 }
 
 .hero-stats {
