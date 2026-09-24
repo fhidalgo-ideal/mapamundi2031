@@ -4,8 +4,8 @@ FROM oven/bun:1-alpine as base
 WORKDIR /app
 
 # Copy package files and install dependencies (production-only)
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+COPY package.json package-lock.json ./
+RUN bun install --production
 
 # Copy application code and configuration
 COPY api/ ./api/
