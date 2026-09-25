@@ -643,6 +643,51 @@ export async function voteForPhoto(
 }
 
 /**
+ * Resolve a photo id the same way voteForPhoto does: a trace's id is its
+ * cover photo (traces.photo), anything else is looked up in trace_photos.
+ * Returns null if photoId matches neither.
+ */
+export async function getPhotoById(
+  photoId: string,
+): Promise<{ traceId: string; path: string; isCover: boolean } | null> {
+  if (backend === "mongodb") {
+    const extra = await tracePhotosCollection!.findOne({ id: photoId });
+    if (extra) return { traceId: extra.trace_id as string, path: extra.path as string, isCover: false };
+    const trace = await tracesCollection!.findOne({ id: photoId });
+    if (trace) return { traceId: trace.id as string, path: trace.photo as string, isCover: true };
+    return null;
+  } else {
+    const extra = sqliteDb!
+      .query("SELECT trace_id, path FROM trace_photos WHERE id = ?")
+      .get(photoId) as { trace_id: string; path: string } | null;
+    if (extra) return { traceId: extra.trace_id, path: extra.path, isCover: false };
+    const trace = sqliteDb!
+      .query("SELECT id, photo FROM traces WHERE id = ?")
+      .get(photoId) as { id: string; photo: string } | null;
+    if (trace) return { traceId: trace.id, path: trace.photo, isCover: true };
+    return null;
+  }
+}
+
+/**
+ * Point a photo (cover or extra, see getPhotoById) at a new file. Votes are
+ * keyed by photo id, so they survive the change.
+ */
+export async function setPhotoPath(photoId: string, isCover: boolean, newPath: string): Promise<boolean> {
+  if (backend === "mongodb") {
+    const collection = isCover ? tracesCollection! : tracePhotosCollection!;
+    const field = isCover ? "photo" : "path";
+    const result = await collection.updateOne({ id: photoId }, { $set: { [field]: newPath } });
+    return result.modifiedCount > 0;
+  } else {
+    const sql = isCover
+      ? "UPDATE traces SET photo = ? WHERE id = ?"
+      : "UPDATE trace_photos SET path = ? WHERE id = ?";
+    return sqliteDb!.prepare(sql).run(newPath, photoId).changes > 0;
+  }
+}
+
+/**
  * Update trace status.
  */
 export async function updateTraceStatus(id: string, status: string): Promise<boolean> {

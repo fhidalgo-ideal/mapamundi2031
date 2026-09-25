@@ -274,6 +274,59 @@ a {
   width: auto;
 }
 
+/* Same "GRANADA 2031 | IDEAL" lockup as the footer, dark on the white bar. */
+.brand-sep {
+  align-self: stretch;
+  background: #b3b3b3;
+  margin: 8px 0;
+  width: 1px;
+}
+
+.brand-logo-ideal {
+  height: 22px;
+  width: auto;
+}
+
+/* On phones both logos plus the menu toggle must share one row, so the
+   lockup shrinks in steps (sized by height; the header wordmark's 190x46
+   contain box would otherwise waste width). */
+@media (max-width: 560px) {
+  .brand {
+    gap: 10px;
+  }
+
+  .brand-logo {
+    height: 15px;
+    max-width: none;
+  }
+
+  .brand-logo-ideal {
+    height: 15px;
+  }
+
+  .brand-sep {
+    margin: 2px 0;
+  }
+}
+
+@media (max-width: 400px) {
+  .brand {
+    gap: 8px;
+  }
+
+  .brand-logo,
+  .brand-logo-ideal {
+    height: 13px;
+  }
+}
+
+@media (max-width: 340px) {
+  .brand-logo,
+  .brand-logo-ideal {
+    height: 11px;
+  }
+}
+
 .brand strong,
 .brand small {
   display: block;
@@ -331,7 +384,12 @@ nav a:hover {
 
 .hero {
   align-items: center;
-  background: var(--bg-light);
+  /* Cream veil over the photo keeps the hero's dark-on-cream text colours
+     legible without restyling them. */
+  background:
+    linear-gradient(rgba(250, 246, 238, 0.82), rgba(250, 246, 238, 0.92)),
+    url("assets/hero-alhambra.webp") center 45% / cover no-repeat,
+    var(--bg-light);
   display: flex;
   justify-content: center;
   min-height: 92vh;
@@ -1693,9 +1751,35 @@ textarea {
 
 .review-photos-extra img {
   border-radius: 4px;
+  display: block;
   height: 26px;
   object-fit: cover;
   width: 26px;
+}
+
+.review-thumb {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.review-rotate {
+  display: flex;
+  gap: 6px;
+}
+
+.review-rotate .button {
+  flex: 1;
+  font-size: 18px;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0;
+}
+
+.review-rotate .button:disabled {
+  cursor: progress;
+  opacity: 0.5;
 }
 
 .review-item h3 {
@@ -1811,33 +1895,64 @@ textarea {
   padding: 22px;
 }
 
+/* One row on desktop: brand | legal links | IDEAL socials | claim. Wraps
+   to two rows below 1200px and one column below 900px (grid areas). */
 .site-footer {
   background: var(--footer-bg);
-  padding: 56px clamp(18px, 4vw, 56px);
+  padding: 48px clamp(18px, 4vw, 56px);
 }
 
 .footer-inner {
-  align-items: flex-end;
-  display: flex;
-  gap: 18px;
-  justify-content: space-between;
-}
-
-.footer-main {
+  align-items: center;
   display: grid;
-  gap: 12px;
-  max-width: 640px;
+  gap: 32px 48px;
+  grid-template-areas: "brand links social claim";
+  grid-template-columns: auto 1fr auto auto;
 }
 
-.footer-main .footer-description {
-  color: var(--ink);
-  font-size: var(--fs-body-lg);
-  line-height: var(--lh-normal);
+/* Default for any footer text, e.g. the legal pages' one-line footer.
+   :where() keeps it at element specificity so the classes below win. */
+:where(.site-footer) p {
+  color: var(--muted);
   margin: 0;
 }
 
-.footer-inner p {
-  color: var(--muted);
+.footer-brand {
+  display: grid;
+  gap: 10px;
+  grid-area: brand;
+}
+
+.footer-logo-link {
+  align-items: center;
+  display: inline-flex;
+  gap: 16px;
+  min-height: 38px;
+}
+
+/* logo.svg is the orange header wordmark; the footer shows it white. */
+.footer-logo-granada {
+  filter: brightness(0) invert(1);
+  height: 22px;
+  width: auto;
+}
+
+.footer-logo-sep {
+  align-self: stretch;
+  background: rgba(246, 241, 232, 0.35);
+  margin: 6px 0;
+  width: 1px;
+}
+
+.footer-logo {
+  max-height: 26px;
+  max-width: 150px;
+  object-fit: contain;
+}
+
+.footer-tagline {
+  color: rgba(246, 241, 232, 0.55);
+  font-size: 13px;
   margin: 0;
 }
 
@@ -1845,30 +1960,86 @@ textarea {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 18px;
+  grid-area: links;
+  justify-self: center;
 }
 
 .footer-links a {
-  color: var(--muted);
+  color: var(--ink);
   font-size: 14px;
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  padding: 4px 18px;
+  text-decoration: none;
+}
+
+.footer-links a:first-child {
+  padding-left: 0;
+}
+
+.footer-links a:last-child {
+  padding-right: 0;
+}
+
+.footer-links a + a {
+  border-left: 1px solid rgba(246, 241, 232, 0.25);
 }
 
 .footer-links a:hover {
   color: var(--accent-bright);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
-.footer-logo-link {
+.footer-social {
+  display: flex;
+  gap: 2px;
+  grid-area: social;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.footer-social a {
   align-items: center;
-  display: inline-flex;
-  min-height: 38px;
+  border-radius: 50%;
+  color: rgba(246, 241, 232, 0.7);
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
 }
 
-.footer-logo {
-  max-height: 36px;
-  max-width: 150px;
-  object-fit: contain;
+.footer-social a:hover {
+  color: var(--accent-bright);
+}
+
+.footer-claim {
+  border-left: 1px solid rgba(246, 241, 232, 0.25);
+  color: var(--ink);
+  font-size: 16px;
+  font-style: italic;
+  grid-area: claim;
+  line-height: 1.5;
+  margin: 0;
+  padding-left: 40px;
+}
+
+/* One sentence per line, as in the design. */
+.footer-claim span {
+  display: block;
+  text-wrap: balance;
+}
+
+@media (max-width: 1200px) {
+  .footer-inner {
+    grid-template-areas:
+      "brand social"
+      "links claim";
+    grid-template-columns: 1fr auto;
+  }
+
+  .footer-links {
+    justify-self: start;
+  }
 }
 
 .footer-logo-fallback {
@@ -2049,8 +2220,67 @@ textarea {
   }
 
   .footer-inner {
+    align-items: start;
+    grid-template-areas:
+      "brand"
+      "social"
+      "links"
+      "claim";
+    grid-template-columns: 1fr;
+    row-gap: 24px;
+  }
+
+  /* Lines the first icon's glyph up with the left edge despite its 44px
+     tap target. */
+  .footer-social {
+    margin-left: -12px;
+  }
+
+  /* Both logos side by side must fit a 320px screen. */
+  .footer-logo-link {
+    gap: 12px;
+  }
+
+  .footer-logo-granada {
+    height: 18px;
+  }
+
+  .footer-logo {
+    max-height: 22px;
+  }
+
+  /* Stacked, so the "|" separators would dangle. */
+  .footer-links {
     align-items: flex-start;
     flex-direction: column;
+    gap: 8px;
+  }
+
+  .footer-links a,
+  .footer-links a + a {
+    border-left: 0;
+    padding: 4px 0;
+  }
+}
+
+@media (max-width: 400px) {
+  .footer-logo-link {
+    gap: 10px;
+  }
+
+  .footer-logo-granada {
+    height: 14px;
+  }
+
+  .footer-logo {
+    max-height: 18px;
+  }
+
+  .footer-claim {
+    border-left: 0;
+    border-top: 1px solid rgba(246, 241, 232, 0.25);
+    max-width: none;
+    padding: 24px 0 0;
   }
 }
 
@@ -2100,8 +2330,21 @@ textarea {
   margin-bottom: 44px;
 }
 
+.hero-actions .button {
+  gap: 10px;
+  letter-spacing: 0.06em;
+  min-height: 52px;
+  padding: 0 24px;
+  text-transform: uppercase;
+}
+
+.hero-actions .button-icon {
+  flex-shrink: 0;
+}
+
 .hero-actions .button.primary {
-  background: var(--coral);
+  background: #bc622a;
+  border: 1.5px solid #bc622a;
   color: var(--bg-light);
 }
 
@@ -2111,12 +2354,385 @@ textarea {
 
 .hero-actions .button.ghost {
   background: transparent;
-  border: 1.5px solid var(--line-light);
-  color: var(--ink-on-light);
+  border: 1.5px solid #bc622a;
+  color: #bc622a;
 }
 
 .hero-actions .button.ghost:hover {
-  background: rgba(26, 26, 26, 0.05);
+  background: rgba(188, 98, 42, 0.08);
+}
+
+/* Discreet variant of .eyebrow: no pill, just spaced coral text (hero,
+   concept section). */
+.eyebrow.eyebrow-plain {
+  background: none;
+  border-radius: 0;
+  color: #bc622a;
+  /* The shared --ls-wide (5px) pushes this long line onto two rows on
+     desktop. */
+  letter-spacing: 0.16em;
+  margin: 0 0 18px;
+  padding: 0;
+}
+
+/* When the line doesn't fit (mobile) it can only break between the two
+   halves, never mid-phrase. */
+.hero-eyebrow span {
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .hero-copy .hero-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+
+  /* Fits "ENCENDER MI PUNTO DE LUZ" on one line from ~360px up; below
+     that it wraps onto two balanced lines. */
+  .hero-actions .button {
+    font-size: 14px;
+    letter-spacing: 0.03em;
+    padding: 0 16px;
+  }
+
+  .hero-actions .button span {
+    text-wrap: balance;
+  }
+}
+
+/* "El concepto": static two-column block (copy left, photo right) between
+   the ticker and "Cómo participar". Stacks copy-first below 900px. */
+/* Bottom padding is the top one minus the next section's 64px top padding
+   ("Cómo participar" / the gallery), so the gap below the content matches
+   the gap above it. "El billete de vuelta" reuses the concept layout. */
+.concept,
+.return-ticket {
+  padding: 96px clamp(18px, 4vw, 56px) 32px;
+}
+
+.concept-inner {
+  align-items: center;
+  display: grid;
+  gap: clamp(32px, 5vw, 80px);
+  grid-template-columns: 1.1fr 0.9fr;
+  margin: 0 auto;
+  max-width: 1160px;
+}
+
+.concept-copy {
+  color: var(--ink-on-light);
+}
+
+.concept-copy h2 {
+  margin-bottom: 24px;
+}
+
+.concept-copy > p:not(.eyebrow) {
+  color: var(--muted-on-light);
+  font-size: 18px;
+  line-height: 1.6;
+  margin: 0 0 16px;
+  max-width: 54ch;
+}
+
+/* Resets the global blockquote (gold rule, light text meant for dark
+   panels). */
+.concept-quote {
+  border: 0;
+  color: var(--ink-on-light);
+  margin: 36px 0 0;
+  padding: 0 0 0 56px;
+  position: relative;
+}
+
+.concept-quote::before {
+  color: #bc622a;
+  content: "\201C";
+  font-size: 110px;
+  font-weight: 800;
+  left: -6px;
+  line-height: 1;
+  position: absolute;
+  top: -14px;
+}
+
+.concept-quote p {
+  font-size: clamp(20px, 2vw, 26px);
+  font-weight: 800;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.concept-figure {
+  margin: 0;
+}
+
+/* The placeholder background keeps the 4:5 box visible while the lazy
+   photo loads. */
+.concept-figure img {
+  aspect-ratio: 4 / 5;
+  background: linear-gradient(160deg, #e9dfcf, #cdb89a);
+  border-radius: 20px;
+  display: block;
+  height: auto;
+  object-fit: cover;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .concept,
+  .return-ticket {
+    padding: 64px clamp(18px, 4vw, 56px) 0;
+  }
+
+  .concept-inner {
+    grid-template-columns: 1fr;
+  }
+
+  /* Landscape on mobile so the photo doesn't take two full screens. */
+  .concept-figure img {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+/* "El billete de vuelta": text + two perks on the left, a CSS-only boarding
+   pass on the right. */
+.return-perks {
+  display: flex;
+  gap: 40px;
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+}
+
+.return-perks li {
+  align-items: center;
+  color: var(--ink-on-light);
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  font-weight: var(--fw-bold);
+  gap: 12px;
+}
+
+.return-perk-icon {
+  align-items: center;
+  background: rgba(188, 98, 42, 0.12);
+  border-radius: 50%;
+  color: #bc622a;
+  display: flex;
+  height: 64px;
+  justify-content: center;
+  width: 64px;
+}
+
+/* Tilt and shadow live on the wrapper: the ticket's notch mask would clip
+   a box-shadow, while drop-shadow follows the masked shape. */
+.ticket-tilt {
+  filter: drop-shadow(0 18px 30px rgba(33, 28, 19, 0.18));
+  transform: rotate(-3deg);
+}
+
+.ticket {
+  --stub: 96px;
+  --notch: 14px;
+  display: grid;
+  grid-template-columns: 1fr var(--stub);
+  min-height: 260px;
+  /* Two half-height layers, each punching one semicircle where the stub
+     starts: top edge and bottom edge. */
+  -webkit-mask:
+    radial-gradient(circle at calc(100% - var(--stub)) 0, transparent var(--notch), #000 calc(var(--notch) + 0.5px)) top / 100% 51% no-repeat,
+    radial-gradient(circle at calc(100% - var(--stub)) 100%, transparent var(--notch), #000 calc(var(--notch) + 0.5px)) bottom / 100% 51% no-repeat;
+  mask:
+    radial-gradient(circle at calc(100% - var(--stub)) 0, transparent var(--notch), #000 calc(var(--notch) + 0.5px)) top / 100% 51% no-repeat,
+    radial-gradient(circle at calc(100% - var(--stub)) 100%, transparent var(--notch), #000 calc(var(--notch) + 0.5px)) bottom / 100% 51% no-repeat;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+/* Faint diagonal lattice, a nod to Nasrid tilework. */
+.ticket-main {
+  background:
+    repeating-linear-gradient(45deg, rgba(188, 98, 42, 0.06) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(-45deg, rgba(188, 98, 42, 0.06) 0 1px, transparent 1px 18px),
+    #fffdf8;
+  display: flex;
+  flex-direction: column;
+}
+
+.ticket-head {
+  align-items: center;
+  background: #bc622a;
+  color: #fff;
+  display: flex;
+  font-size: 13px;
+  font-weight: var(--fw-extrabold);
+  gap: 12px;
+  letter-spacing: 0.16em;
+  padding: 18px 24px;
+  text-transform: uppercase;
+}
+
+.ticket-head svg {
+  flex: none;
+}
+
+.ticket-route {
+  color: #bc622a;
+  display: block;
+  margin: auto;
+  padding: 20px 28px 8px;
+  width: 100%;
+}
+
+.ticket-barcode {
+  background: repeating-linear-gradient(90deg,
+    var(--ink-on-light) 0 2px, transparent 2px 4px,
+    var(--ink-on-light) 4px 5px, transparent 5px 8px,
+    var(--ink-on-light) 8px 11px, transparent 11px 13px);
+  height: 36px;
+  margin: 0 24px 22px;
+  opacity: 0.75;
+}
+
+.ticket-stub {
+  align-items: center;
+  background: #bc622a;
+  border-left: 2px dashed rgba(255, 253, 248, 0.7);
+  color: #fff;
+  display: flex;
+  justify-content: center;
+}
+
+.ticket-stub span {
+  font-size: 18px;
+  font-weight: var(--fw-extrabold);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+}
+
+@media (max-width: 900px) {
+  .ticket-tilt {
+    transform: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .ticket {
+    --stub: 64px;
+    min-height: 220px;
+  }
+
+  .ticket-head {
+    font-size: 11px;
+    padding: 14px 16px;
+  }
+
+  .ticket-stub span {
+    font-size: 14px;
+  }
+}
+
+/* Closing call to action after the gallery. Unlike the hero's light veil,
+   a dark one keeps the white copy readable over the sunset photo; the
+   solid colour is the fallback while the image loads. */
+.closing {
+  align-items: center;
+  background:
+    linear-gradient(rgba(14, 12, 9, 0.55), rgba(14, 12, 9, 0.72)),
+    url("assets/cierre-alhambra.webp") center 45% / cover,
+    #2a2218;
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  min-height: 560px;
+  padding: 96px clamp(18px, 4vw, 56px);
+  text-align: center;
+}
+
+.closing h2 {
+  color: #fff;
+  font-size: clamp(40px, 6vw, 80px);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin: 0 0 20px;
+}
+
+.closing-subtitle {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: clamp(18px, 1.8vw, 22px);
+  margin: 0 0 40px;
+}
+
+.closing .hero-actions {
+  margin-bottom: 0;
+}
+
+/* The hero's coral outline is too faint over the dark photo. */
+.closing .hero-actions .button.ghost {
+  border-color: #fff;
+  color: #fff;
+}
+
+.closing .hero-actions .button.ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* As in the design, the closing photo and the footer read as one block:
+   no gap between them and only the outer corners rounded. The closing
+   section is the last thing in <main>, the footer the next sibling. */
+.closing:last-child {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Extra breathing room above it (112px total with the 16px card gap, the
+   same rhythm as around "El concepto") so it doesn't read as glued to the
+   delete-photo banner. */
+.closing {
+  margin-top: 96px;
+}
+
+.page-stack:has(> .closing:last-child) + .site-footer {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  margin-top: calc(-1 * var(--card-gap));
+}
+
+@media (max-width: 900px) {
+  .closing {
+    min-height: 480px;
+    padding: 72px clamp(18px, 4vw, 56px);
+  }
+}
+
+/* p.hero-tagline (not just .hero-tagline) to outrank
+   `.hero-copy p:not(.eyebrow)`, which would otherwise restyle it as the lead
+   paragraph. The concept photo caption reuses the same look. */
+.hero-copy p.hero-tagline,
+.concept-figure figcaption {
+  border-top: 1px solid var(--line-light);
+  color: var(--muted-on-light);
+  font-size: 16px;
+  font-style: italic;
+  line-height: 1.5;
+  margin: 36px auto 0;
+  max-width: 460px;
+  padding-top: 22px;
+}
+
+/* Must follow the shared rule above to override it: no divider (the photo
+   already separates it), slightly larger, centred under the photo. */
+.concept-figure figcaption {
+  border-top: 0;
+  font-size: 18px;
+  margin-top: 20px;
+  padding-top: 0;
+  text-align: center;
 }
 
 .hero-stats {

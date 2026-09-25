@@ -275,17 +275,47 @@ function renderReviewList() {
     const item = node.querySelector("article");
     const img = node.querySelector("img");
     const editForm = node.querySelector(".edit-form");
-    img.src = trace.photo;
-    img.alt = `Revision de ${trace.name}`;
+    // The big image is the one the rotate buttons act on. With several photos,
+    // every one (cover included) gets a thumbnail that brings it up there —
+    // the 26px thumbnails alone are too small to judge orientation.
+    const photos = trace.photos || [{ id: trace.id, url: trace.photo }];
+    let shownPhoto = photos[0];
+    const showPhoto = (photo, index) => {
+      shownPhoto = photo;
+      img.src = photo.url;
+      img.alt = index === 0 ? `Revision de ${trace.name}` : `Foto ${index + 1} de ${trace.name}`;
+    };
+    showPhoto(shownPhoto, 0);
     const extraPhotos = node.querySelector(".review-photos-extra");
-    const extraPhotoEntries = (trace.photos || []).slice(1);
     extraPhotos.innerHTML = "";
-    extraPhotos.classList.toggle("hidden", extraPhotoEntries.length === 0);
-    extraPhotoEntries.forEach((photo, index) => {
-      const extraImage = document.createElement("img");
-      extraImage.src = photo.url;
-      extraImage.alt = `Foto adicional ${index + 2} de ${trace.name}`;
-      extraPhotos.appendChild(extraImage);
+    extraPhotos.classList.toggle("hidden", photos.length < 2);
+    if (photos.length > 1) {
+      photos.forEach((photo, index) => {
+        const thumb = document.createElement("button");
+        thumb.type = "button";
+        thumb.className = "review-thumb";
+        thumb.setAttribute("aria-label", `Ver foto ${index + 1} de ${trace.name}`);
+        const thumbImage = document.createElement("img");
+        thumbImage.src = photo.url;
+        thumbImage.alt = "";
+        thumb.appendChild(thumbImage);
+        thumb.addEventListener("click", () => showPhoto(photo, index));
+        extraPhotos.appendChild(thumb);
+      });
+    }
+    const rotateButtons = node.querySelectorAll(".rotate-photo");
+    rotateButtons.forEach((button) => {
+      button.addEventListener("click", async () => {
+        const photo = shownPhoto;
+        rotateButtons.forEach((other) => { other.disabled = true; });
+        const rotated = await rotatePhoto(trace, photo, button.dataset.direction);
+        rotateButtons.forEach((other) => { other.disabled = false; });
+        if (!rotated) return;
+        const index = photos.indexOf(photo);
+        if (shownPhoto === photo) showPhoto(photo, index);
+        const thumbImage = extraPhotos.querySelectorAll("img")[index];
+        if (thumbImage) thumbImage.src = photo.url;
+      });
     });
     node.querySelector(".status-badge").textContent = STATUS_LABELS[trace.status] || trace.status;
     node.querySelector(".status-badge").className = `status-badge ${trace.status}`;
@@ -403,6 +433,28 @@ async function updateStatus(id, status) {
     await loadAdminTraces();
   } catch (error) {
     adminStatus.textContent = error.message;
+  }
+}
+
+// Updates the photo object in place (it lives in adminTraces) instead of
+// reloading everything, so the review list keeps its scroll and selection.
+async function rotatePhoto(trace, photo, direction) {
+  try {
+    const payload = await apiRequest(`/admin/photos/${photo.id}/rotate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ direction })
+    });
+    photo.url = payload.photo.url;
+    if (photo.id === trace.id) trace.photo = photo.url;
+    renderVotes();
+    return true;
+  } catch (error) {
+    adminStatus.textContent = error.message;
+    return false;
   }
 }
 

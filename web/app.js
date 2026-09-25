@@ -433,7 +433,7 @@ function renderArchive() {
     });
 
     node.querySelector("[data-open-map]").addEventListener("click", () => {
-      document.querySelector(".map-section")?.scrollIntoView({ behavior: "smooth" });
+      scrollToMap();
       openStory(trace);
     });
     archiveGrid.appendChild(node);
@@ -727,8 +727,13 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-document.querySelector("#heroViewMap")?.addEventListener("click", () => {
+function scrollToMap() {
   document.querySelector(".map-section")?.scrollIntoView({ behavior: "smooth" });
+}
+
+// Hero and closing section "Ver el mapa en vivo" buttons.
+document.querySelectorAll("[data-scroll-to-map]").forEach((trigger) => {
+  trigger.addEventListener("click", scrollToMap);
 });
 
 // Self-service deletion: the code shown after uploading is "<trace id>:<deletion

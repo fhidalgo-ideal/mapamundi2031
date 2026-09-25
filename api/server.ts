@@ -14,6 +14,8 @@ import {
   getAuditLogs,
   addNotifySignup,
   voteForPhoto,
+  getPhotoById,
+  setPhotoPath,
   closeDatabase,
   type TraceRecord,
   type TracePhotoRecord,
@@ -21,7 +23,8 @@ import {
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
+import sharp from "sharp";
 
 // server.ts lives in api/; BASE_DIR is that folder, ROOT_DIR is the repo root.
 // Runtime state (data/, uploads/, config.json, .dev) and the static folders
@@ -89,7 +92,7 @@ const DEFAULT_PUBLIC_CONFIG = {
   archive_eyebrow: "Historias publicadas",
   archive_title: "Archivo de luces",
   consent_text: "Acepto que esta fotografía y el texto se usen en la acción cultural Granada 2031.",
-  footer_text: "Granada 2031. Geolocalización del Sentimiento.",
+  footer_text: "Un proyecto de IDEAL para una Granada más abierta al mundo.",
   privacy_label: "Política de privacidad",
   privacy_url: "/politica-de-privacidad",
   legal_label: "Aviso legal",
@@ -519,6 +522,34 @@ function readImageDimensions(data: Uint8Array, kind: string): [number, number] {
   return [0, 0];
 }
 
+
+// Re-encodes a sharp pipeline in the upload's own format. PNG gets no quality
+// option on purpose: for sharp that switches it to a lossy palette.
+function encodeAsType(pipeline: sharp.Sharp, kind: string): Promise<Buffer> {
+  if (kind === "image/png") return pipeline.png().toBuffer();
+  if (kind === "image/webp") return pipeline.webp({ quality: 90 }).toBuffer();
+  return pipeline.jpeg({ quality: 90 }).toBuffer();
+}
+
+function sharpInput(data: Uint8Array): sharp.Sharp {
+  // Same ceiling as the header-only dimension guard, enforced again at decode.
+  return sharp(data, { limitInputPixels: MAX_IMAGE_DIMENSION * MAX_IMAGE_DIMENSION });
+}
+
+// iPhones store sensor-oriented pixels plus an EXIF Orientation tag, which
+// stripExif() would drop without applying, leaving the photo sideways. Photos
+// carrying a non-default orientation are rotated for real and re-encoded
+// (sharp writes no metadata unless asked, so GPS etc. go too); every other
+// photo returns null and keeps the byte-level stripExif() path, untouched.
+async function applyExifOrientation(data: Uint8Array, kind: string): Promise<Uint8Array | null> {
+  try {
+    const { orientation } = await sharp(data).metadata();
+    if (!orientation || orientation === 1) return null;
+    return new Uint8Array(await encodeAsType(sharpInput(data).rotate(), kind));
+  } catch {
+    return null; // sharp can't read/decode it: fall back to the existing strip
+  }
+}
 
 // Removes EXIF metadata (which routinely carries GPS coordinates, device
 // serials and timestamps) from a validated image before it is persisted. Works
@@ -1083,9 +1114,11 @@ async function validateAndSanitizePhoto(
   }
 
   // Use sniffed type for extension to ensure content/extension alignment. Strip
-  // EXIF (GPS/device metadata) before the bytes ever touch disk.
+  // EXIF (GPS/device metadata) before the bytes ever touch disk, applying the
+  // orientation first when the photo depends on it (see applyExifOrientation).
+  const oriented = await applyExifOrientation(headerBytes, sniffedType);
   return {
-    sanitized: stripExif(headerBytes, sniffedType),
+    sanitized: oriented ?? stripExif(headerBytes, sniffedType),
     extension: ALLOWED_IMAGE_TYPES[sniffedType]!,
   };
 }
@@ -1367,6 +1400,47 @@ async function deleteTraceRow(traceId: string): Promise<void> {
     unlinkUploadFile(extra.path);
   }
 }
+// Admin fix-up for photos uploaded sideways (e.g. iPhone shots from before
+// applyExifOrientation existed). The result goes to a NEW file name: /uploads/
+// is served "immutable" for 30 days, so overwriting in place would keep
+// showing the old pixels. Votes are keyed by photo id and survive.
+async function handleRotatePhoto(request: Request, photoId: string, server?: IpResolvingServer): Promise<Response> {
+  let payload: { direction?: unknown };
+  try {
+    payload = await request.json();
+  } catch {
+    return errorResponse("JSON no valido.");
+  }
+  const angle = payload.direction === "cw" ? 90 : payload.direction === "ccw" ? -90 : null;
+  if (angle === null) {
+    return errorResponse("Dirección no válida.");
+  }
+
+  const photo = await getPhotoById(photoId);
+  if (!photo || !photo.path.startsWith("/uploads/")) {
+    return errorResponse("No existe esa foto.", 404);
+  }
+  const extension = extname(photo.path).toLowerCase();
+  const kind = Object.keys(ALLOWED_IMAGE_TYPES).find((type) => ALLOWED_IMAGE_TYPES[type] === extension);
+  const sourcePath = resolve(UPLOAD_DIR, photo.path.slice("/uploads/".length));
+  if (!kind || !sourcePath.startsWith(resolve(UPLOAD_DIR) + sep) || !existsSync(sourcePath)) {
+    return errorResponse("No existe esa foto.", 404);
+  }
+
+  const rotated = await encodeAsType(sharpInput(readFileSync(sourcePath)).rotate(angle), kind);
+  const newFileName = `${photoId}-r${Date.now().toString(36)}${extension}`;
+  const newPath = `/uploads/${newFileName}`;
+  await Bun.write(join(UPLOAD_DIR, newFileName), rotated);
+  if (!(await setPhotoPath(photoId, photo.isCover, newPath))) {
+    unlinkUploadFile(newPath);
+    return errorResponse("No existe esa foto.", 404);
+  }
+  unlinkUploadFile(photo.path);
+
+  await recordAuditLog("rotate_photo", photo.traceId, getClientIp(request, server));
+  return jsonResponse({ photo: { id: photoId, url: newPath } });
+}
+
 async function handleDeleteTrace(request: Request, traceId: string, server?: IpResolvingServer): Promise<Response> {
   const trace = await getTraceById(traceId);
   if (!trace) {
@@ -1541,6 +1615,12 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
     }
     if (normalizedPath === "/api/notify-signup") {
       return handleNotifySignup(request, server);
+    }
+    if (normalizedPath.startsWith("/api/admin/photos/") && normalizedPath.endsWith("/rotate")) {
+      const denied = requireAdmin(request);
+      if (denied) return denied;
+      const photoId = normalizedPath.slice("/api/admin/photos/".length, -"/rotate".length);
+      return handleRotatePhoto(request, photoId, server);
     }
     if (normalizedPath.startsWith("/api/photos/") && normalizedPath.endsWith("/vote")) {
       const photoId = normalizedPath.slice("/api/photos/".length, -"/vote".length);

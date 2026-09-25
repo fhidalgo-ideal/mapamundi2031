@@ -8,6 +8,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Subprocess } from "bun";
+import sharp from "sharp";
 
 // A real, decoder-valid baseline JPEG (2x2 px, generated with Pillow and
 // verified to decode). Exercises the full upload path — signature sniffing
@@ -1081,6 +1082,133 @@ describe("smoke", () => {
       headers: { "X-Forwarded-For": "203.0.113.163" },
     });
     expect(response.status).toBe(404);
+  });
+
+  // iPhones save sensor-oriented pixels + EXIF Orientation=6 ("rotate 90° to
+  // display"). The fixture mimics that: 40x20 pixels, meant to be shown 20x40.
+  async function orientedJpeg(): Promise<Uint8Array> {
+    const bytes = await sharp({ create: { width: 40, height: 20, channels: 3, background: "#c1622d" } })
+      .jpeg()
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    return new Uint8Array(bytes);
+  }
+
+  let orientedTraceId: string;
+  let orientedExtraId: string;
+
+  test("ORIENT01: POST /api/traces applies EXIF Orientation before stripping EXIF", async () => {
+    const fixture = await orientedJpeg();
+    // Sanity-check the fixture, otherwise the assertions below are vacuous.
+    const fixtureMeta = await sharp(fixture).metadata();
+    expect(fixtureMeta.orientation).toBe(6);
+    expect([fixtureMeta.width, fixtureMeta.height]).toEqual([40, 20]);
+
+    const form = new FormData();
+    form.set("name", "Orientation Test");
+    form.set("email", "orientation@example.com");
+    form.set("city", "Granada");
+    form.set("country", "Espana");
+    form.set("relation", "Visitante");
+    form.set("emotion", "asombro");
+    form.set("feeling", "Testing EXIF orientation.");
+    form.set("consent", "true");
+    form.append("photo", new File([fixture], "iphone.jpg", { type: "image/jpeg" }));
+    form.append("photo", new File([fixture], "iphone-2.jpg", { type: "image/jpeg" }));
+
+    const response = await fetch(`${baseUrl}/api/traces`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.170" },
+      body: form,
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    orientedTraceId = body.trace.id;
+    orientedExtraId = body.trace.photos[1].id;
+
+    for (const photo of body.trace.photos) {
+      const persisted = readFileSync(join(dataDir, photo.url));
+      const meta = await sharp(persisted).metadata();
+      // Pixels rotated for real, and nothing left for a viewer to re-apply.
+      expect([meta.width, meta.height]).toEqual([20, 40]);
+      expect(meta.orientation).toBeUndefined();
+      expect(meta.exif).toBeUndefined();
+    }
+  });
+
+  test("ORIENT02: POST /api/admin/photos/:id/rotate turns the photo into a new file and keeps its votes", async () => {
+    const vote = await fetch(`${baseUrl}/api/photos/${orientedTraceId}/vote`, {
+      method: "POST",
+      headers: { "X-Forwarded-For": "203.0.113.171" },
+    });
+    expect(vote.status).toBe(200);
+
+    const before = await (await fetch(`${baseUrl}/api/admin/traces`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    })).json();
+    const oldUrl = before.traces.find((trace: { id: string }) => trace.id === orientedTraceId).photo;
+
+    const response = await fetch(`${baseUrl}/api/admin/photos/${orientedTraceId}/rotate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ direction: "cw" }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    // New name: /uploads/ is served immutable, so the old URL must not be reused.
+    expect(body.photo.url).not.toBe(oldUrl);
+    expect(existsSync(join(dataDir, oldUrl))).toBe(false);
+    const meta = await sharp(readFileSync(join(dataDir, body.photo.url))).metadata();
+    expect([meta.width, meta.height]).toEqual([40, 20]);
+
+    const after = await (await fetch(`${baseUrl}/api/admin/traces`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    })).json();
+    const trace = after.traces.find((item: { id: string }) => item.id === orientedTraceId);
+    expect(trace.photo).toBe(body.photo.url);
+    expect(trace.photos[0].voteCount).toBe(1);
+  });
+
+  test("ORIENT02: rotating an extra photo updates only that photo", async () => {
+    const response = await fetch(`${baseUrl}/api/admin/photos/${orientedExtraId}/rotate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ direction: "ccw" }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const meta = await sharp(readFileSync(join(dataDir, body.photo.url))).metadata();
+    expect([meta.width, meta.height]).toEqual([40, 20]);
+
+    const after = await (await fetch(`${baseUrl}/api/admin/traces`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    })).json();
+    const trace = after.traces.find((item: { id: string }) => item.id === orientedTraceId);
+    expect(trace.photos[1].url).toBe(body.photo.url);
+  });
+
+  test("ORIENT02: rotate requires admin auth, a known photo and a valid direction", async () => {
+    const url = `${baseUrl}/api/admin/photos/${orientedTraceId}/rotate`;
+    const noAuth = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ direction: "cw" }),
+    });
+    expect(noAuth.status).toBe(401);
+
+    const unknown = await fetch(`${baseUrl}/api/admin/photos/does-not-exist/rotate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ direction: "cw" }),
+    });
+    expect(unknown.status).toBe(404);
+
+    const badDirection = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ direction: "upside-down" }),
+    });
+    expect(badDirection.status).toBe(400);
   });
 
 });
