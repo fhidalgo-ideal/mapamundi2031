@@ -89,7 +89,7 @@ const DEFAULT_PUBLIC_CONFIG = {
   archive_eyebrow: "Historias publicadas",
   archive_title: "Archivo de luces",
   consent_text: "Acepto que esta fotografía y el texto se usen en la acción cultural Granada 2031.",
-  footer_text: "Granada 2031. Geolocalización del Sentimiento.",
+  footer_text: "Un proyecto de IDEAL para una Granada más abierta al mundo.",
   privacy_label: "Política de privacidad",
   privacy_url: "/politica-de-privacidad",
   legal_label: "Aviso legal",
