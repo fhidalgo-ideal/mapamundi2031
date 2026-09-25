@@ -9,6 +9,7 @@ import {
   getTraces,
   addTracePhoto,
   getTracePhotos,
+  getTracePhotosForTraces,
   getPhotoById,
   setPhotoPath,
   updateTraceStatus,
@@ -123,6 +124,29 @@ describe("Database Layer - SQLite", () => {
     expect((await getTraceById("trace-photos-test"))?.photo).toBe("/uploads/main-r1.jpg");
     const photos = await getTracePhotos("trace-photos-test");
     expect(photos.map((photo) => photo.path)).toEqual(["/uploads/extra-1.jpg", "/uploads/extra-2-r1.jpg"]);
+  });
+
+  it("should load the extra photos of many traces in one call, grouped and ordered", async () => {
+    const base = {
+      email: "batch@example.com", city: "Granada", country: "Spain", lat: 37.1882, lng: -3.6385,
+      relation: "lived", emotion: "asombro", feeling: "Batch", status: "pending", consent: 1,
+      created_at: new Date().toISOString(), deletion_token_hash: null,
+    };
+    await createTrace({ ...base, id: "batch-a", name: "Batch A", photo: "/uploads/batch-a.jpg" } as TraceRecord);
+    await createTrace({ ...base, id: "batch-b", name: "Batch B", photo: "/uploads/batch-b.jpg" } as TraceRecord);
+    // Inserted out of order on purpose: the result must follow position.
+    await addTracePhoto("batch-a", "batch-a-3", "/uploads/batch-a-3.jpg", 3, new Date().toISOString());
+    await addTracePhoto("batch-a", "batch-a-1", "/uploads/batch-a-1.jpg", 1, new Date().toISOString());
+    await addTracePhoto("batch-a", "batch-a-2", "/uploads/batch-a-2.jpg", 2, new Date().toISOString());
+
+    const byTrace = await getTracePhotosForTraces(["batch-a", "batch-b", "trace-photos-test", "no-such-trace"]);
+    expect(byTrace.get("batch-a")?.map((photo) => photo.id)).toEqual(["batch-a-1", "batch-a-2", "batch-a-3"]);
+    expect(byTrace.has("batch-b")).toBe(false); // no extras
+    expect(byTrace.get("trace-photos-test")?.length).toBe(2);
+    expect(byTrace.has("no-such-trace")).toBe(false);
+    // Same content as the one-trace-at-a-time lookup it replaces in lists.
+    expect(byTrace.get("batch-a")).toEqual(await getTracePhotos("batch-a"));
+    expect((await getTracePhotosForTraces([])).size).toBe(0);
   });
 
   it("should update trace status", async () => {
@@ -296,6 +320,28 @@ describe.skipIf(!process.env.GRANADA_TEST_MONGO_URI)("Database Layer - MongoDB",
     expect(photos.length).toBe(2);
     expect(photos[0].position).toBe(1);
     expect(photos[1].position).toBe(2);
+  });
+
+  it("should load the extra photos of many traces in one call in MongoDB", async () => {
+    const stamp = Date.now();
+    const base = {
+      email: "mongobatch@example.com", city: "Granada", country: "Spain", lat: 37.1882, lng: -3.6385,
+      relation: "lived", emotion: "asombro", feeling: "Batch", status: "pending", consent: 1,
+      created_at: new Date().toISOString(), deletion_token_hash: null,
+    };
+    const a = `mongo-batch-a-${stamp}`;
+    const b = `mongo-batch-b-${stamp}`;
+    await createTrace({ ...base, id: a, name: "Batch A", photo: "/uploads/mb-a.jpg" } as TraceRecord);
+    await createTrace({ ...base, id: b, name: "Batch B", photo: "/uploads/mb-b.jpg" } as TraceRecord);
+    await addTracePhoto(a, `${a}-2`, "/uploads/mb-a-2.jpg", 2, new Date().toISOString());
+    await addTracePhoto(a, `${a}-1`, "/uploads/mb-a-1.jpg", 1, new Date().toISOString());
+    await addTracePhoto(b, `${b}-1`, "/uploads/mb-b-1.jpg", 1, new Date().toISOString());
+
+    const byTrace = await getTracePhotosForTraces([a, b, "no-such-trace"]);
+    expect(byTrace.get(a)?.map((photo) => photo.id)).toEqual([`${a}-1`, `${a}-2`]);
+    expect(byTrace.get(b)?.map((photo) => photo.id)).toEqual([`${b}-1`]);
+    expect(byTrace.has("no-such-trace")).toBe(false);
+    expect(byTrace.get(a)).toEqual(await getTracePhotos(a));
   });
 
   it("should update trace status in MongoDB", async () => {
