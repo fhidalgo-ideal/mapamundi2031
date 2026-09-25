@@ -680,7 +680,7 @@ document.addEventListener("keydown", (event) => {
 setStatusFilter(reviewStatusFilter);
 
 // Same brand lockup as the public header: the GRANADA 2031 logo and name come
-// from the public config (editable here), with the text fallback when unset.
+// from the public config (config.json), with the text fallback when unset.
 async function loadBrand() {
   let config;
   try {

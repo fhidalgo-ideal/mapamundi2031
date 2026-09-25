@@ -1394,6 +1394,20 @@ textarea {
   margin-top: 4px;
 }
 
+/* The legal text must be readable by whoever accepts it: the shared
+   `.consent span` grey (--muted) is made for dark panels and nearly vanishes
+   on the cream form. */
+.consent > span {
+  color: var(--muted-on-light);
+}
+
+/* Legal link inside the consent label: underlined, unlike the site's links. */
+.consent a {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .hp-field {
   position: absolute;
   overflow: hidden;

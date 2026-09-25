@@ -184,9 +184,10 @@ function applyPublicConfig(config) {
   setText("#submit-title", config.submit_title);
   setText("#archiveEyebrow", config.archive_eyebrow);
   setText("#archive-title", config.archive_title);
-  setText("#consentText", config.consent_text);
   setText("#footerText", config.footer_text);
   setLink("#privacyLink", config.privacy_label, config.privacy_url);
+  // The consent checkbox links to the same policy as the footer.
+  setLink("#consentPrivacyLink", null, config.privacy_url);
   setLink("#legalLink", config.legal_label, config.legal_url);
   setLink("#idealLogoLink", null, config.ideal_url);
   applyLogo("#brandLogo", "#brandMark", config.brand_logo, config.brand_logo_alt, "#brandText");

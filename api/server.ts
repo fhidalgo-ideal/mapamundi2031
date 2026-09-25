@@ -91,7 +91,6 @@ const DEFAULT_PUBLIC_CONFIG = {
   submit_title: "Sube tu rastro de Granada",
   archive_eyebrow: "Historias publicadas",
   archive_title: "Archivo de luces",
-  consent_text: "Acepto que esta fotografía y el texto se usen en la acción cultural Granada 2031.",
   footer_text: "Un proyecto de IDEAL para una Granada más abierta al mundo.",
   privacy_label: "Política de privacidad",
   privacy_url: "/politica-de-privacidad",
