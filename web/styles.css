@@ -1782,6 +1782,140 @@ textarea {
   opacity: 0.5;
 }
 
+/* The status tabs reuse .chip, whose colours are made for the dark map panel
+   (cream text on near-transparent fills): on the admin's cream page the
+   active tab was invisible and the rest barely readable. Scoped to
+   .review-controls so the map's emotion filters are untouched. */
+.review-controls .chip {
+  background: transparent;
+  border-color: var(--line-light);
+  color: rgba(33, 28, 19, 0.75);
+}
+
+/* Hover only adds the underline: the colour stays exactly as without it. */
+.review-controls .chip:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.review-controls .chip.active {
+  background: rgba(188, 98, 42, 0.12);
+  border-color: #bc622a;
+  color: #8a451b;
+  font-weight: 700;
+}
+
+.review-controls .chip:focus-visible {
+  outline: 2px solid #bc622a;
+  outline-offset: 2px;
+}
+
+/* Review cards take the admin layout's full width (they were auto-placed
+   into the 220px counter column), two per row; one on phones (900px query). */
+.review-list {
+  align-items: start;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.review-list .review-item {
+  align-items: start;
+  grid-template-columns: 120px 1fr;
+}
+
+.review-list .review-actions {
+  grid-column: 1 / -1;
+}
+
+/* Admin list pagination, same look as the status tabs above. */
+.pager {
+  align-items: center;
+  display: flex;
+  /* Explicit: the mobile query stacks every <nav> into a column. */
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-column: 1 / -1;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.pager button {
+  background: transparent;
+  border: 1px solid var(--line-light);
+  border-radius: 999px;
+  color: rgba(33, 28, 19, 0.75);
+  cursor: pointer;
+  font: 600 14px/1 var(--font-family-base);
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 12px;
+}
+
+.pager button:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pager button[aria-current="page"] {
+  background: rgba(188, 98, 42, 0.12);
+  border-color: #bc622a;
+  color: #8a451b;
+  font-weight: 700;
+}
+
+.pager button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.pager button:focus-visible {
+  outline: 2px solid #bc622a;
+  outline-offset: 2px;
+}
+
+.pager-gap {
+  color: var(--muted-on-light);
+  padding: 0 2px;
+}
+
+.pager-summary {
+  color: var(--muted-on-light);
+  font-size: 13px;
+  margin: 4px 0 0;
+  text-align: center;
+  width: 100%;
+}
+
+/* The votes panel is a dark card: light variant, with the panel's own gold
+   for the current page. */
+.votes-panel .pager button {
+  border-color: var(--line);
+  color: rgba(246, 241, 232, 0.8);
+}
+
+.votes-panel .pager button[aria-current="page"] {
+  background: rgba(247, 198, 103, 0.18);
+  border-color: rgba(247, 198, 103, 0.55);
+  color: var(--ink);
+}
+
+.votes-panel .pager-gap,
+.votes-panel .pager-summary {
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .review-list {
+    grid-template-columns: 1fr;
+  }
+
+  /* Keep the existing mobile photo column (the rule above outranks it). */
+  .review-list .review-item {
+    grid-template-columns: 92px 1fr;
+  }
+}
+
 /* Read by screen readers, invisible on screen. */
 .visually-hidden {
   clip: rect(0 0 0 0);

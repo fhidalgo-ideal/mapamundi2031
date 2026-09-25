@@ -26,6 +26,11 @@ let chartGroupBy = "country";
 let chartDefaultsSet = false;
 let reviewSearchQuery = "";
 let reviewStatusFilter = "all";
+const reviewPager = document.querySelector("#reviewPager");
+const votesPager = document.querySelector("#votesPager");
+const PAGE_SIZE = 10;
+let reviewPage = 1;
+let votesPage = 1;
 
 async function apiRequest(path, options = {}) {
   let response;
@@ -252,8 +257,60 @@ function matchesReviewSearch(trace, normalizedQuery) {
   return haystack.includes(normalizedQuery);
 }
 
+// Client-side for now: GET /api/admin/traces already returns everything.
+// Kept as one helper so moving pagination to the API later only changes
+// where the items and total come from, not the UI. Out-of-range pages clamp
+// (e.g. after deleting the last card of the last page).
+function paginate(items, page) {
+  const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const current = Math.min(Math.max(1, page), pages);
+  const start = (current - 1) * PAGE_SIZE;
+  return { items: items.slice(start, start + PAGE_SIZE), page: current, pages, total: items.length, start };
+}
+
+// "‹ Anterior 1 … 4 [5] 6 … 20 Siguiente ›" plus "11–20 de 34". Hidden when
+// everything fits on one page. First, last and the current page's
+// neighbours are always shown; gaps collapse into an ellipsis.
+function renderPager(container, result, onChange) {
+  container.innerHTML = "";
+  container.classList.toggle("hidden", result.pages < 2);
+  if (result.pages < 2) return;
+
+  const addButton = (label, page, { current = false, disabled = false, ariaLabel } = {}) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.disabled = disabled;
+    if (ariaLabel) button.setAttribute("aria-label", ariaLabel);
+    if (current) button.setAttribute("aria-current", "page");
+    button.addEventListener("click", () => onChange(page));
+    container.appendChild(button);
+  };
+
+  addButton("‹ Anterior", result.page - 1, { disabled: result.page === 1 });
+  const shown = [...new Set([1, result.page - 1, result.page, result.page + 1, result.pages])]
+    .filter((page) => page >= 1 && page <= result.pages)
+    .sort((a, b) => a - b);
+  shown.forEach((page, index) => {
+    if (index > 0 && page - shown[index - 1] > 1) {
+      const gap = document.createElement("span");
+      gap.className = "pager-gap";
+      gap.textContent = "…";
+      container.appendChild(gap);
+    }
+    addButton(String(page), page, { current: page === result.page, ariaLabel: `Página ${page}` });
+  });
+  addButton("Siguiente ›", result.page + 1, { disabled: result.page === result.pages });
+
+  const summary = document.createElement("p");
+  summary.className = "pager-summary";
+  summary.textContent = `${result.start + 1}–${result.start + result.items.length} de ${result.total}`;
+  container.appendChild(summary);
+}
+
 function renderReviewList() {
   reviewList.innerHTML = "";
+  reviewPager.classList.add("hidden");
   if (!adminToken) {
     reviewList.innerHTML = `<p class="empty-state">Introduce la password de administracion para revisar contribuciones.</p>`;
     return;
@@ -274,7 +331,15 @@ function renderReviewList() {
     return;
   }
 
-  visible.forEach((trace) => {
+  const result = paginate(visible, reviewPage);
+  reviewPage = result.page;
+  renderPager(reviewPager, result, (page) => {
+    reviewPage = page;
+    renderReviewList();
+    document.querySelector("#revision").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  result.items.forEach((trace) => {
     const node = template.content.cloneNode(true);
     const item = node.querySelector("article");
     const img = node.querySelector("img");
@@ -327,6 +392,9 @@ function renderReviewList() {
     node.querySelector("p").textContent = trace.feeling;
     node.querySelector("small").textContent = `${trace.email} - ${trace.relation} - ${trace.emotion}`;
     fillEditForm(editForm, trace);
+    // Approving an already approved contribution is a no-op; every other
+    // action stays available whatever the status.
+    node.querySelector(".approve").classList.toggle("hidden", trace.status === "approved");
     node.querySelector(".approve").addEventListener("click", () => updateStatus(trace.id, "approved"));
     node.querySelector(".reject").addEventListener("click", () => updateStatus(trace.id, "rejected"));
     node.querySelector(".edit").addEventListener("click", () => editForm.classList.remove("hidden"));
@@ -368,6 +436,7 @@ function jumpToReview(trace) {
 // submenu's current item) always match the list that is shown.
 function setStatusFilter(status) {
   reviewStatusFilter = status;
+  reviewPage = 1;
   statusFilterButtons.forEach((button) => {
     const active = button.dataset.statusFilter === status;
     button.classList.toggle("active", active);
@@ -388,13 +457,22 @@ function renderVotes() {
 
   const rows = flattenPhotosByVotes();
   votesList.innerHTML = "";
+  votesPager.classList.add("hidden");
 
   if (rows.length === 0) {
     votesList.innerHTML = `<p class="empty-state">Aun no hay fotos.</p>`;
     return;
   }
 
-  rows.forEach(({ photo, trace }) => {
+  const result = paginate(rows, votesPage);
+  votesPage = result.page;
+  renderPager(votesPager, result, (page) => {
+    votesPage = page;
+    renderVotes();
+    adminVotes.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  result.items.forEach(({ photo, trace }) => {
     const item = document.createElement("article");
     item.className = "votes-item";
 
@@ -559,6 +637,7 @@ chartToggleButtons.forEach((button) => {
 
 reviewSearchInput.addEventListener("input", () => {
   reviewSearchQuery = reviewSearchInput.value;
+  reviewPage = 1;
   renderReviewList();
 });
 statusFilterButtons.forEach((button) => {

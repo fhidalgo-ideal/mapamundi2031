@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/styles.css?v=20260925-9">
+    <link rel="stylesheet" href="/styles.css?v=20260925-11">
   </head>
   <body>
     <header class="topbar" id="topbar">
@@ -97,6 +97,7 @@
         <section class="votes-panel chart-card hidden" id="adminVotes" aria-labelledby="votes-title">
           <p class="eyebrow" id="votes-title">Fotos mas votadas</p>
           <div class="votes-list" id="votesList"></div>
+          <nav class="pager hidden" id="votesPager" aria-label="Paginación de fotos más votadas"></nav>
         </section>
         <div class="admin-layout" id="revision">
           <div class="metric">
@@ -120,6 +121,7 @@
             </div>
           </div>
           <div class="review-list" id="reviewList"></div>
+          <nav class="pager hidden" id="reviewPager" aria-label="Paginación de contribuciones"></nav>
         </div>
       </section>
     </main>
@@ -157,6 +159,6 @@
     </template>
 
     <script src="/nav-toggle.js?v=20260925-2"></script>
-    <script src="admin.js?v=20260925-3"></script>
+    <script src="admin.js?v=20260925-5"></script>
   </body>
 </html>
