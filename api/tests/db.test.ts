@@ -9,6 +9,8 @@ import {
   getTraces,
   addTracePhoto,
   getTracePhotos,
+  getPhotoById,
+  setPhotoPath,
   updateTraceStatus,
   updateTrace,
   deleteTrace,
@@ -100,6 +102,27 @@ describe("Database Layer - SQLite", () => {
     expect(photos.length).toBe(2);
     expect(photos[0].position).toBe(1);
     expect(photos[1].position).toBe(2);
+  });
+
+  it("should resolve a photo id to the cover or an extra and repoint its file", async () => {
+    // Reuses the trace + extras created by the previous test.
+    expect(await getPhotoById("trace-photos-test")).toEqual({
+      traceId: "trace-photos-test",
+      path: "/uploads/main.jpg",
+      isCover: true,
+    });
+    expect(await getPhotoById("photo-2")).toEqual({
+      traceId: "trace-photos-test",
+      path: "/uploads/extra-2.jpg",
+      isCover: false,
+    });
+    expect(await getPhotoById("no-such-photo")).toBeNull();
+
+    expect(await setPhotoPath("trace-photos-test", true, "/uploads/main-r1.jpg")).toBe(true);
+    expect(await setPhotoPath("photo-2", false, "/uploads/extra-2-r1.jpg")).toBe(true);
+    expect((await getTraceById("trace-photos-test"))?.photo).toBe("/uploads/main-r1.jpg");
+    const photos = await getTracePhotos("trace-photos-test");
+    expect(photos.map((photo) => photo.path)).toEqual(["/uploads/extra-1.jpg", "/uploads/extra-2-r1.jpg"]);
   });
 
   it("should update trace status", async () => {

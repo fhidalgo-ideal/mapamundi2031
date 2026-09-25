@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "dependencies": {
     "leaflet": "^1.9.4",
-    "mongodb": "6.21.0"
+    "mongodb": "6.21.0",
+    "sharp": "^0.34.5"
   },
   "description": "Granada 2031 - Geolocalizacion del Sentimiento. Servidor Bun con SQLite integrado, sin dependencias de runtime en el servidor. El frontend usa Leaflet (vendorizado en web/vendor/leaflet/) para el mapa de OpenStreetMap.",
   "engines": {
