@@ -19,6 +19,9 @@ const chartByPlaceTitle = document.querySelector("#chartByPlaceTitle");
 const chartToggleButtons = document.querySelectorAll(".chart-toggle-btn");
 const reviewSearchInput = document.querySelector("#reviewSearch");
 const statusFilterButtons = document.querySelectorAll("[data-status-filter]");
+const adminQuickLinks = document.querySelector("#adminQuickLinks");
+const photosMenu = document.querySelector("#photosMenu");
+const photosMenuToggle = document.querySelector("#photosMenuToggle");
 let chartGroupBy = "country";
 let chartDefaultsSet = false;
 let reviewSearchQuery = "";
@@ -65,6 +68,7 @@ function renderAdmin() {
   pendingCount.textContent = adminTraces.filter((trace) => trace.status === "pending").length;
   adminLoginForm.classList.toggle("hidden", Boolean(adminToken));
   adminLogout.classList.toggle("hidden", !adminToken);
+  adminQuickLinks.classList.toggle("hidden", !adminToken);
   renderReviewList();
   renderCharts();
   renderVotes();
@@ -353,12 +357,26 @@ function flattenPhotosByVotes() {
 // Reuses the review list's own search box to locate the trace a voted photo
 // belongs to, instead of adding a second way to jump to a contribution.
 function jumpToReview(trace) {
-  reviewStatusFilter = "all";
-  statusFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.statusFilter === "all"));
   reviewSearchQuery = trace.name;
   reviewSearchInput.value = trace.name;
-  renderReviewList();
+  setStatusFilter("all");
   reviewList.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Single entry point for the status filter: the tabs, "Ver en revision" and
+// the "Gestión fotos" submenu all go through here, so the active tab (and the
+// submenu's current item) always match the list that is shown.
+function setStatusFilter(status) {
+  reviewStatusFilter = status;
+  statusFilterButtons.forEach((button) => {
+    const active = button.dataset.statusFilter === status;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  photosMenu.querySelectorAll("[data-jump-status]").forEach((link) => {
+    link.toggleAttribute("aria-current", link.dataset.jumpStatus === status);
+  });
+  renderReviewList();
 }
 
 function renderVotes() {
@@ -544,12 +562,69 @@ reviewSearchInput.addEventListener("input", () => {
   renderReviewList();
 });
 statusFilterButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    reviewStatusFilter = button.dataset.statusFilter;
-    statusFilterButtons.forEach((other) => other.classList.toggle("active", other === button));
-    renderReviewList();
-  });
+  button.addEventListener("click", () => setStatusFilter(button.dataset.statusFilter));
 });
+
+function setPhotosMenuOpen(open) {
+  photosMenu.classList.toggle("hidden", !open);
+  photosMenuToggle.setAttribute("aria-expanded", String(open));
+}
+
+photosMenuToggle.addEventListener("click", () => {
+  setPhotosMenuOpen(photosMenu.classList.contains("hidden"));
+});
+
+photosMenu.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-jump-status]");
+  if (!link) return;
+  event.preventDefault();
+  // A status jump shows the whole list for that status, not a stale search.
+  reviewSearchQuery = "";
+  reviewSearchInput.value = "";
+  setStatusFilter(link.dataset.jumpStatus);
+  setPhotosMenuOpen(false);
+  document.querySelector("#revision").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// Click outside or Escape closes it (Escape hands focus back to the toggle).
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".admin-quick-menu")) setPhotosMenuOpen(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !photosMenu.classList.contains("hidden")) {
+    setPhotosMenuOpen(false);
+    photosMenuToggle.focus();
+  }
+});
+
+// Reflect the initial "Todas" state (aria-pressed / aria-current) from load.
+setStatusFilter(reviewStatusFilter);
+
+// Same brand lockup as the public header: the GRANADA 2031 logo and name come
+// from the public config (editable here), with the text fallback when unset.
+async function loadBrand() {
+  let config;
+  try {
+    ({ config } = await apiRequest("/config"));
+  } catch {
+    return; // keep the text fallback; the panel works without it
+  }
+  if (config.brand_name) document.querySelector("#brandName").textContent = config.brand_name;
+  if (config.brand_subtitle) document.querySelector("#brandSubtitle").textContent = config.brand_subtitle;
+  const logo = document.querySelector("#brandLogo");
+  const hasLogo = Boolean(config.brand_logo);
+  if (hasLogo) {
+    logo.src = config.brand_logo;
+    logo.alt = config.brand_logo_alt || "";
+  }
+  logo.classList.toggle("hidden", !hasLogo);
+  document.querySelector("#brandMark").classList.toggle("hidden", hasLogo);
+  document.querySelector("#brandText").classList.toggle("hidden", hasLogo);
+  const label = [config.brand_name, config.brand_subtitle].filter(Boolean).join(" | ");
+  if (label) document.querySelector("#brandLink").setAttribute("aria-label", label);
+}
+
+loadBrand();
 
 loadAdminTraces().catch((error) => {
   adminToken = "";

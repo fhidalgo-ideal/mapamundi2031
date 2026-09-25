@@ -1782,6 +1782,130 @@ textarea {
   opacity: 0.5;
 }
 
+/* Read by screen readers, invisible on screen. */
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* Admin quick access, in the header nav. */
+.admin-quick-links {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.admin-quick {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--line-light);
+  border-radius: 999px;
+  color: var(--ink-on-light);
+  cursor: pointer;
+  display: inline-flex;
+  font: 600 14px/1 var(--font-family-base);
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 16px;
+}
+
+.admin-quick:hover,
+.admin-quick[aria-expanded="true"] {
+  background: rgba(188, 98, 42, 0.08);
+  border-color: #bc622a;
+  color: #bc622a;
+}
+
+.admin-quick:focus-visible,
+.admin-submenu a:focus-visible {
+  outline: 2px solid #bc622a;
+  outline-offset: 2px;
+}
+
+.admin-quick-chevron {
+  transition: transform 0.15s ease;
+}
+
+.admin-quick[aria-expanded="true"] .admin-quick-chevron {
+  transform: rotate(180deg);
+}
+
+/* Leaves the backend for the public site (new tab): the site's blue instead
+   of the admin orange, filled, with an "out" arrow — noticeable, not a
+   warning. Darker than --blue so white text keeps its contrast. */
+.admin-quick-public {
+  background: #3f5a94;
+  border-color: #3f5a94;
+  color: #fff;
+}
+
+.admin-quick-public:hover {
+  background: #34497a;
+  border-color: #34497a;
+  color: #fff;
+}
+
+.admin-quick-menu {
+  position: relative;
+}
+
+.admin-submenu {
+  background: #fff;
+  border: 1px solid var(--line-light);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(33, 28, 19, 0.12);
+  left: 0;
+  list-style: none;
+  margin: 0;
+  min-width: 190px;
+  padding: 6px;
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 20;
+}
+
+.admin-submenu a {
+  border-radius: 8px;
+  color: var(--ink-on-light);
+  display: block;
+  font-size: 14px;
+  padding: 9px 12px;
+}
+
+.admin-submenu a:hover {
+  background: rgba(188, 98, 42, 0.08);
+}
+
+.admin-submenu a[aria-current] {
+  color: #bc622a;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .admin-quick-links {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-quick {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  /* Inside the hamburger panel the submenu unfolds in place, indented. */
+  .admin-submenu {
+    border: 0;
+    box-shadow: none;
+    padding: 4px 0 0 12px;
+    position: static;
+  }
+}
+
 .review-item h3 {
   margin-bottom: 5px;
 }
