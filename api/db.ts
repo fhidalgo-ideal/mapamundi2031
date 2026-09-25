@@ -561,6 +561,49 @@ export async function getTracePhotos(traceId: string): Promise<TracePhotoRecord[
 }
 
 /**
+ * Extra photos for many traces at once, grouped by trace id and ordered by
+ * position — one query per batch instead of one getTracePhotos() per trace
+ * when listing. Traces without extras are simply absent from the map.
+ */
+export async function getTracePhotosForTraces(
+  traceIds: string[],
+): Promise<Map<string, TracePhotoRecord[]>> {
+  const byTrace = new Map<string, TracePhotoRecord[]>();
+  if (traceIds.length === 0) return byTrace;
+  const add = (photo: TracePhotoRecord) => {
+    const list = byTrace.get(photo.trace_id);
+    if (list) list.push(photo);
+    else byTrace.set(photo.trace_id, [photo]);
+  };
+
+  if (backend === "mongodb") {
+    const docs = await tracePhotosCollection!.find({ trace_id: { $in: traceIds } })
+      .sort({ position: 1 })
+      .toArray();
+    docs.forEach((doc: any) => add({
+      id: doc.id as string,
+      trace_id: doc.trace_id as string,
+      path: doc.path as string,
+      position: doc.position as number,
+      created_at: doc.created_at as string,
+      vote_count: (doc.vote_count as number) ?? 0,
+    }));
+  } else {
+    // Chunked to stay well under SQLite's bound-parameter limit.
+    const CHUNK = 500;
+    for (let i = 0; i < traceIds.length; i += CHUNK) {
+      const chunk = traceIds.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(", ");
+      const rows = sqliteDb!
+        .query(`SELECT * FROM trace_photos WHERE trace_id IN (${placeholders}) ORDER BY position ASC`)
+        .all(...chunk) as TracePhotoRecord[];
+      rows.forEach(add);
+    }
+  }
+  return byTrace;
+}
+
+/**
  * Cast a vote for a photo from a given (already-hashed) IP.
  *
  * photoId is either a trace's id (the cover photo, which has no row of its

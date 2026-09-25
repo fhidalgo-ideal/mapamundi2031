@@ -7,6 +7,7 @@ import {
   createTrace,
   addTracePhoto,
   getTracePhotos,
+  getTracePhotosForTraces,
   updateTraceStatus,
   updateTrace,
   deleteTrace,
@@ -764,9 +765,16 @@ function requireAdmin(request: Request): Response | null {
   return null;
 }
 
+// Lists load every trace's extra photos in one batch (getTracePhotosForTraces)
+// instead of one query per trace, then map each trace with its own slice.
+async function tracesToPublic(dbTraces: TraceRecord[]) {
+  const extrasByTrace = await getTracePhotosForTraces(dbTraces.map((trace) => trace.id));
+  return Promise.all(dbTraces.map((trace) => dbTraceToPublic(trace, extrasByTrace.get(trace.id) ?? [])));
+}
+
 async function handleGetTraces(): Promise<Response> {
   const dbTraces = await getTraces(true); // approvedOnly = true
-  const traces = await Promise.all(dbTraces.map(dbTraceToPublic));
+  const traces = await tracesToPublic(dbTraces);
   return jsonResponse({ traces });
 }
 
@@ -774,9 +782,8 @@ async function handleGetAdminTraces(): Promise<Response> {
   const dbTraces = await getTraces(false); // approvedOnly = false, get all
   // Admins need the contributor's email to moderate/contact; the public
   // shape from dbTraceToPublic strips it, so it's added back here only.
-  const traces = await Promise.all(
-    dbTraces.map(async (trace) => ({ ...(await dbTraceToPublic(trace)), email: trace.email })),
-  );
+  const publicTraces = await tracesToPublic(dbTraces);
+  const traces = publicTraces.map((trace, index) => ({ ...trace, email: dbTraces[index].email }));
   return jsonResponse({ traces });
 }
 
@@ -831,8 +838,11 @@ async function recordAuditLog(action: string, traceId: string | null, sourceIp: 
 // cover photo has no row of its own in trace_photos (see TracePhotoRecord), so
 // it borrows the trace's own id — safe because a trace id and a trace_photos
 // id are never the same value.
-async function dbTraceToPublic(trace: TraceRecord) {
-  const extraPhotos = await getTracePhotos(trace.id);
+//
+// List callers pass extraPhotos preloaded in one batch (see tracesToPublic);
+// single-trace callers omit it and it is fetched here.
+async function dbTraceToPublic(trace: TraceRecord, extraPhotos?: TracePhotoRecord[]) {
+  extraPhotos ??= await getTracePhotos(trace.id);
   const photos = [
     { id: trace.id, url: trace.photo, voteCount: trace.photo_vote_count ?? 0 },
     ...extraPhotos.map((p) => ({ id: p.id, url: p.path, voteCount: p.vote_count ?? 0 })),
