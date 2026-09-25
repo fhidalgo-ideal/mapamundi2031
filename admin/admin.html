@@ -3,25 +3,52 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Administracion | Granada 2031</title>
+    <title>Administración | Granada 2031</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/styles.css?v=20260925-7">
+    <link rel="stylesheet" href="/styles.css?v=20260925-11">
   </head>
   <body>
     <header class="topbar" id="topbar">
-      <a class="brand" href="/" aria-label="Granada 2031">
-        <img class="brand-logo" src="/assets/logo.svg" alt="Granada 2031">
+      <a class="brand" id="brandLink" href="https://2031granadaideal.es/" aria-label="Granada 2031">
+        <span class="brand-mark" id="brandMark"></span>
+        <img class="brand-logo hidden" id="brandLogo" alt="">
+        <span id="brandText">
+          <strong id="brandName">Granada 2031</strong>
+          <small id="brandSubtitle">Geolocalización del Sentimiento</small>
+        </span>
+        <span class="brand-sep" aria-hidden="true"></span>
+        <img class="brand-logo-ideal" src="/assets/logo-ideal.svg" width="256" height="48" alt="IDEAL">
       </a>
-      <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="topbarNav">
+      <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="topbarNav">
         <span class="nav-toggle-bar"></span>
         <span class="nav-toggle-bar"></span>
         <span class="nav-toggle-bar"></span>
       </button>
       <div class="topbar-nav" id="topbarNav">
-        <nav aria-label="Navegacion de administracion">
-          <a href="/">Ver mapa publico</a>
+        <nav aria-label="Navegación de administración">
+          <!-- Only with a session: the sections they jump to are hidden without one. -->
+          <div class="admin-quick-links hidden" id="adminQuickLinks">
+            <a class="admin-quick" href="#adminVotes">Fotos más votadas</a>
+            <div class="admin-quick-menu">
+              <button class="admin-quick" id="photosMenuToggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="photosMenu">
+                Gestión fotos
+                <svg class="admin-quick-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <ul class="admin-submenu hidden" id="photosMenu">
+                <li><a href="#revision" data-jump-status="all">Todas</a></li>
+                <li><a href="#revision" data-jump-status="pending">Pendientes</a></li>
+                <li><a href="#revision" data-jump-status="approved">Aprobadas</a></li>
+                <li><a href="#revision" data-jump-status="rejected">Rechazadas</a></li>
+              </ul>
+            </div>
+          </div>
+          <a class="admin-quick admin-quick-public" href="/#mapa-en-vivo" target="_blank" rel="noopener">
+            Ver mapa público
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17 17 7M9 7h8v8"/></svg>
+            <span class="visually-hidden">(se abre en una pestaña nueva)</span>
+          </a>
         </nav>
       </div>
     </header>
@@ -29,8 +56,8 @@
     <main class="admin-page">
       <section class="admin-section" aria-labelledby="admin-title">
         <div class="section-heading">
-          <p class="eyebrow">Backend protegido</p>
-          <h1 id="admin-title">Administracion</h1>
+          <p class="eyebrow">Gestor Mapamundi</p>
+          <h1 id="admin-title">Administración</h1>
           <p class="admin-intro">Revisa las contribuciones pendientes antes de publicarlas en el mapa.</p>
         </div>
         <form class="admin-login" id="adminLoginForm">
@@ -70,8 +97,9 @@
         <section class="votes-panel chart-card hidden" id="adminVotes" aria-labelledby="votes-title">
           <p class="eyebrow" id="votes-title">Fotos mas votadas</p>
           <div class="votes-list" id="votesList"></div>
+          <nav class="pager hidden" id="votesPager" aria-label="Paginación de fotos más votadas"></nav>
         </section>
-        <div class="admin-layout">
+        <div class="admin-layout" id="revision">
           <div class="metric">
             <strong id="pendingCount">0</strong>
             <span>pendientes</span>
@@ -93,6 +121,7 @@
             </div>
           </div>
           <div class="review-list" id="reviewList"></div>
+          <nav class="pager hidden" id="reviewPager" aria-label="Paginación de contribuciones"></nav>
         </div>
       </section>
     </main>
@@ -129,7 +158,7 @@
       </article>
     </template>
 
-    <script src="/nav-toggle.js?v=20260915-1"></script>
-    <script src="admin.js?v=20260925-1"></script>
+    <script src="/nav-toggle.js?v=20260925-2"></script>
+    <script src="admin.js?v=20260925-5"></script>
   </body>
 </html>

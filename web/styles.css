@@ -1782,6 +1782,264 @@ textarea {
   opacity: 0.5;
 }
 
+/* The status tabs reuse .chip, whose colours are made for the dark map panel
+   (cream text on near-transparent fills): on the admin's cream page the
+   active tab was invisible and the rest barely readable. Scoped to
+   .review-controls so the map's emotion filters are untouched. */
+.review-controls .chip {
+  background: transparent;
+  border-color: var(--line-light);
+  color: rgba(33, 28, 19, 0.75);
+}
+
+/* Hover only adds the underline: the colour stays exactly as without it. */
+.review-controls .chip:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.review-controls .chip.active {
+  background: rgba(188, 98, 42, 0.12);
+  border-color: #bc622a;
+  color: #8a451b;
+  font-weight: 700;
+}
+
+.review-controls .chip:focus-visible {
+  outline: 2px solid #bc622a;
+  outline-offset: 2px;
+}
+
+/* Review cards take the admin layout's full width (they were auto-placed
+   into the 220px counter column), two per row; one on phones (900px query). */
+.review-list {
+  align-items: start;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.review-list .review-item {
+  align-items: start;
+  grid-template-columns: 120px 1fr;
+}
+
+.review-list .review-actions {
+  grid-column: 1 / -1;
+}
+
+/* Admin list pagination, same look as the status tabs above. */
+.pager {
+  align-items: center;
+  display: flex;
+  /* Explicit: the mobile query stacks every <nav> into a column. */
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-column: 1 / -1;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.pager button {
+  background: transparent;
+  border: 1px solid var(--line-light);
+  border-radius: 999px;
+  color: rgba(33, 28, 19, 0.75);
+  cursor: pointer;
+  font: 600 14px/1 var(--font-family-base);
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 12px;
+}
+
+.pager button:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pager button[aria-current="page"] {
+  background: rgba(188, 98, 42, 0.12);
+  border-color: #bc622a;
+  color: #8a451b;
+  font-weight: 700;
+}
+
+.pager button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.pager button:focus-visible {
+  outline: 2px solid #bc622a;
+  outline-offset: 2px;
+}
+
+.pager-gap {
+  color: var(--muted-on-light);
+  padding: 0 2px;
+}
+
+.pager-summary {
+  color: var(--muted-on-light);
+  font-size: 13px;
+  margin: 4px 0 0;
+  text-align: center;
+  width: 100%;
+}
+
+/* The votes panel is a dark card: light variant, with the panel's own gold
+   for the current page. */
+.votes-panel .pager button {
+  border-color: var(--line);
+  color: rgba(246, 241, 232, 0.8);
+}
+
+.votes-panel .pager button[aria-current="page"] {
+  background: rgba(247, 198, 103, 0.18);
+  border-color: rgba(247, 198, 103, 0.55);
+  color: var(--ink);
+}
+
+.votes-panel .pager-gap,
+.votes-panel .pager-summary {
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .review-list {
+    grid-template-columns: 1fr;
+  }
+
+  /* Keep the existing mobile photo column (the rule above outranks it). */
+  .review-list .review-item {
+    grid-template-columns: 92px 1fr;
+  }
+}
+
+/* Read by screen readers, invisible on screen. */
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* Admin quick access, in the header nav. */
+.admin-quick-links {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.admin-quick {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--line-light);
+  border-radius: 999px;
+  color: var(--ink-on-light);
+  cursor: pointer;
+  display: inline-flex;
+  font: 600 14px/1 var(--font-family-base);
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 16px;
+}
+
+.admin-quick:hover,
+.admin-quick[aria-expanded="true"] {
+  background: rgba(188, 98, 42, 0.08);
+  border-color: #bc622a;
+  color: #bc622a;
+}
+
+.admin-quick:focus-visible,
+.admin-submenu a:focus-visible {
+  outline: 2px solid #bc622a;
+  outline-offset: 2px;
+}
+
+.admin-quick-chevron {
+  transition: transform 0.15s ease;
+}
+
+.admin-quick[aria-expanded="true"] .admin-quick-chevron {
+  transform: rotate(180deg);
+}
+
+/* Leaves the backend for the public site (new tab): the site's blue instead
+   of the admin orange, filled, with an "out" arrow — noticeable, not a
+   warning. Darker than --blue so white text keeps its contrast. */
+.admin-quick-public {
+  background: #3f5a94;
+  border-color: #3f5a94;
+  color: #fff;
+}
+
+.admin-quick-public:hover {
+  background: #34497a;
+  border-color: #34497a;
+  color: #fff;
+}
+
+.admin-quick-menu {
+  position: relative;
+}
+
+.admin-submenu {
+  background: #fff;
+  border: 1px solid var(--line-light);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(33, 28, 19, 0.12);
+  left: 0;
+  list-style: none;
+  margin: 0;
+  min-width: 190px;
+  padding: 6px;
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 20;
+}
+
+.admin-submenu a {
+  border-radius: 8px;
+  color: var(--ink-on-light);
+  display: block;
+  font-size: 14px;
+  padding: 9px 12px;
+}
+
+.admin-submenu a:hover {
+  background: rgba(188, 98, 42, 0.08);
+}
+
+.admin-submenu a[aria-current] {
+  color: #bc622a;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .admin-quick-links {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-quick {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  /* Inside the hamburger panel the submenu unfolds in place, indented. */
+  .admin-submenu {
+    border: 0;
+    box-shadow: none;
+    padding: 4px 0 0 12px;
+    position: static;
+  }
+}
+
 .review-item h3 {
   margin-bottom: 5px;
 }

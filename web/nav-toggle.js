@@ -13,19 +13,20 @@
     if (!topbarEl.classList.contains("nav-open")) return;
     topbarEl.classList.remove("nav-open");
     navToggle.setAttribute("aria-expanded", "false");
-    navToggle.setAttribute("aria-label", "Abrir menu");
+    navToggle.setAttribute("aria-label", "Abrir menú");
   }
 
   navToggle.addEventListener("click", () => {
     const isOpen = topbarEl.classList.toggle("nav-open");
     navToggle.setAttribute("aria-expanded", String(isOpen));
-    navToggle.setAttribute("aria-label", isOpen ? "Cerrar menu" : "Abrir menu");
+    navToggle.setAttribute("aria-label", isOpen ? "Cerrar menú" : "Abrir menú");
   });
 
   // Picking a link or the CTA closes the panel instead of leaving it open
-  // over the section/page it just jumped to.
+  // over the section/page it just jumped to. A submenu toggle (aria-haspopup)
+  // opens more options instead of navigating, so it leaves the panel open.
   document.querySelector("#topbarNav")?.addEventListener("click", (event) => {
-    if (event.target.closest("a, button")) closeMobileNav();
+    if (event.target.closest("a, button:not([aria-haspopup])")) closeMobileNav();
   });
 
   document.addEventListener("keydown", (event) => {

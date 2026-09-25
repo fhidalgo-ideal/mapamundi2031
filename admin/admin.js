@@ -19,10 +19,18 @@ const chartByPlaceTitle = document.querySelector("#chartByPlaceTitle");
 const chartToggleButtons = document.querySelectorAll(".chart-toggle-btn");
 const reviewSearchInput = document.querySelector("#reviewSearch");
 const statusFilterButtons = document.querySelectorAll("[data-status-filter]");
+const adminQuickLinks = document.querySelector("#adminQuickLinks");
+const photosMenu = document.querySelector("#photosMenu");
+const photosMenuToggle = document.querySelector("#photosMenuToggle");
 let chartGroupBy = "country";
 let chartDefaultsSet = false;
 let reviewSearchQuery = "";
 let reviewStatusFilter = "all";
+const reviewPager = document.querySelector("#reviewPager");
+const votesPager = document.querySelector("#votesPager");
+const PAGE_SIZE = 10;
+let reviewPage = 1;
+let votesPage = 1;
 
 async function apiRequest(path, options = {}) {
   let response;
@@ -65,6 +73,7 @@ function renderAdmin() {
   pendingCount.textContent = adminTraces.filter((trace) => trace.status === "pending").length;
   adminLoginForm.classList.toggle("hidden", Boolean(adminToken));
   adminLogout.classList.toggle("hidden", !adminToken);
+  adminQuickLinks.classList.toggle("hidden", !adminToken);
   renderReviewList();
   renderCharts();
   renderVotes();
@@ -248,8 +257,60 @@ function matchesReviewSearch(trace, normalizedQuery) {
   return haystack.includes(normalizedQuery);
 }
 
+// Client-side for now: GET /api/admin/traces already returns everything.
+// Kept as one helper so moving pagination to the API later only changes
+// where the items and total come from, not the UI. Out-of-range pages clamp
+// (e.g. after deleting the last card of the last page).
+function paginate(items, page) {
+  const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const current = Math.min(Math.max(1, page), pages);
+  const start = (current - 1) * PAGE_SIZE;
+  return { items: items.slice(start, start + PAGE_SIZE), page: current, pages, total: items.length, start };
+}
+
+// "‹ Anterior 1 … 4 [5] 6 … 20 Siguiente ›" plus "11–20 de 34". Hidden when
+// everything fits on one page. First, last and the current page's
+// neighbours are always shown; gaps collapse into an ellipsis.
+function renderPager(container, result, onChange) {
+  container.innerHTML = "";
+  container.classList.toggle("hidden", result.pages < 2);
+  if (result.pages < 2) return;
+
+  const addButton = (label, page, { current = false, disabled = false, ariaLabel } = {}) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.disabled = disabled;
+    if (ariaLabel) button.setAttribute("aria-label", ariaLabel);
+    if (current) button.setAttribute("aria-current", "page");
+    button.addEventListener("click", () => onChange(page));
+    container.appendChild(button);
+  };
+
+  addButton("‹ Anterior", result.page - 1, { disabled: result.page === 1 });
+  const shown = [...new Set([1, result.page - 1, result.page, result.page + 1, result.pages])]
+    .filter((page) => page >= 1 && page <= result.pages)
+    .sort((a, b) => a - b);
+  shown.forEach((page, index) => {
+    if (index > 0 && page - shown[index - 1] > 1) {
+      const gap = document.createElement("span");
+      gap.className = "pager-gap";
+      gap.textContent = "…";
+      container.appendChild(gap);
+    }
+    addButton(String(page), page, { current: page === result.page, ariaLabel: `Página ${page}` });
+  });
+  addButton("Siguiente ›", result.page + 1, { disabled: result.page === result.pages });
+
+  const summary = document.createElement("p");
+  summary.className = "pager-summary";
+  summary.textContent = `${result.start + 1}–${result.start + result.items.length} de ${result.total}`;
+  container.appendChild(summary);
+}
+
 function renderReviewList() {
   reviewList.innerHTML = "";
+  reviewPager.classList.add("hidden");
   if (!adminToken) {
     reviewList.innerHTML = `<p class="empty-state">Introduce la password de administracion para revisar contribuciones.</p>`;
     return;
@@ -270,7 +331,15 @@ function renderReviewList() {
     return;
   }
 
-  visible.forEach((trace) => {
+  const result = paginate(visible, reviewPage);
+  reviewPage = result.page;
+  renderPager(reviewPager, result, (page) => {
+    reviewPage = page;
+    renderReviewList();
+    document.querySelector("#revision").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  result.items.forEach((trace) => {
     const node = template.content.cloneNode(true);
     const item = node.querySelector("article");
     const img = node.querySelector("img");
@@ -323,6 +392,9 @@ function renderReviewList() {
     node.querySelector("p").textContent = trace.feeling;
     node.querySelector("small").textContent = `${trace.email} - ${trace.relation} - ${trace.emotion}`;
     fillEditForm(editForm, trace);
+    // Approving an already approved contribution is a no-op; every other
+    // action stays available whatever the status.
+    node.querySelector(".approve").classList.toggle("hidden", trace.status === "approved");
     node.querySelector(".approve").addEventListener("click", () => updateStatus(trace.id, "approved"));
     node.querySelector(".reject").addEventListener("click", () => updateStatus(trace.id, "rejected"));
     node.querySelector(".edit").addEventListener("click", () => editForm.classList.remove("hidden"));
@@ -353,12 +425,27 @@ function flattenPhotosByVotes() {
 // Reuses the review list's own search box to locate the trace a voted photo
 // belongs to, instead of adding a second way to jump to a contribution.
 function jumpToReview(trace) {
-  reviewStatusFilter = "all";
-  statusFilterButtons.forEach((button) => button.classList.toggle("active", button.dataset.statusFilter === "all"));
   reviewSearchQuery = trace.name;
   reviewSearchInput.value = trace.name;
-  renderReviewList();
+  setStatusFilter("all");
   reviewList.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Single entry point for the status filter: the tabs, "Ver en revision" and
+// the "Gestión fotos" submenu all go through here, so the active tab (and the
+// submenu's current item) always match the list that is shown.
+function setStatusFilter(status) {
+  reviewStatusFilter = status;
+  reviewPage = 1;
+  statusFilterButtons.forEach((button) => {
+    const active = button.dataset.statusFilter === status;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  photosMenu.querySelectorAll("[data-jump-status]").forEach((link) => {
+    link.toggleAttribute("aria-current", link.dataset.jumpStatus === status);
+  });
+  renderReviewList();
 }
 
 function renderVotes() {
@@ -370,13 +457,22 @@ function renderVotes() {
 
   const rows = flattenPhotosByVotes();
   votesList.innerHTML = "";
+  votesPager.classList.add("hidden");
 
   if (rows.length === 0) {
     votesList.innerHTML = `<p class="empty-state">Aun no hay fotos.</p>`;
     return;
   }
 
-  rows.forEach(({ photo, trace }) => {
+  const result = paginate(rows, votesPage);
+  votesPage = result.page;
+  renderPager(votesPager, result, (page) => {
+    votesPage = page;
+    renderVotes();
+    adminVotes.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  result.items.forEach(({ photo, trace }) => {
     const item = document.createElement("article");
     item.className = "votes-item";
 
@@ -541,15 +637,73 @@ chartToggleButtons.forEach((button) => {
 
 reviewSearchInput.addEventListener("input", () => {
   reviewSearchQuery = reviewSearchInput.value;
+  reviewPage = 1;
   renderReviewList();
 });
 statusFilterButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    reviewStatusFilter = button.dataset.statusFilter;
-    statusFilterButtons.forEach((other) => other.classList.toggle("active", other === button));
-    renderReviewList();
-  });
+  button.addEventListener("click", () => setStatusFilter(button.dataset.statusFilter));
 });
+
+function setPhotosMenuOpen(open) {
+  photosMenu.classList.toggle("hidden", !open);
+  photosMenuToggle.setAttribute("aria-expanded", String(open));
+}
+
+photosMenuToggle.addEventListener("click", () => {
+  setPhotosMenuOpen(photosMenu.classList.contains("hidden"));
+});
+
+photosMenu.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-jump-status]");
+  if (!link) return;
+  event.preventDefault();
+  // A status jump shows the whole list for that status, not a stale search.
+  reviewSearchQuery = "";
+  reviewSearchInput.value = "";
+  setStatusFilter(link.dataset.jumpStatus);
+  setPhotosMenuOpen(false);
+  document.querySelector("#revision").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// Click outside or Escape closes it (Escape hands focus back to the toggle).
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".admin-quick-menu")) setPhotosMenuOpen(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !photosMenu.classList.contains("hidden")) {
+    setPhotosMenuOpen(false);
+    photosMenuToggle.focus();
+  }
+});
+
+// Reflect the initial "Todas" state (aria-pressed / aria-current) from load.
+setStatusFilter(reviewStatusFilter);
+
+// Same brand lockup as the public header: the GRANADA 2031 logo and name come
+// from the public config (editable here), with the text fallback when unset.
+async function loadBrand() {
+  let config;
+  try {
+    ({ config } = await apiRequest("/config"));
+  } catch {
+    return; // keep the text fallback; the panel works without it
+  }
+  if (config.brand_name) document.querySelector("#brandName").textContent = config.brand_name;
+  if (config.brand_subtitle) document.querySelector("#brandSubtitle").textContent = config.brand_subtitle;
+  const logo = document.querySelector("#brandLogo");
+  const hasLogo = Boolean(config.brand_logo);
+  if (hasLogo) {
+    logo.src = config.brand_logo;
+    logo.alt = config.brand_logo_alt || "";
+  }
+  logo.classList.toggle("hidden", !hasLogo);
+  document.querySelector("#brandMark").classList.toggle("hidden", hasLogo);
+  document.querySelector("#brandText").classList.toggle("hidden", hasLogo);
+  const label = [config.brand_name, config.brand_subtitle].filter(Boolean).join(" | ");
+  if (label) document.querySelector("#brandLink").setAttribute("aria-label", label);
+}
+
+loadBrand();
 
 loadAdminTraces().catch((error) => {
   adminToken = "";
