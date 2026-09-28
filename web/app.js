@@ -808,6 +808,11 @@ function renderSponsors(tiers) {
   document.querySelectorAll("[data-sponsor-tier]").forEach((block) => {
     const sponsors = tiers[block.dataset.sponsorTier] || [];
     block.querySelector(".sponsors-logos").replaceChildren(...sponsors.map(sponsorLogoItem));
+    // A heading with singular/plural variants follows the logo count.
+    const heading = block.querySelector(".sponsors-heading");
+    if (heading?.dataset.headingMany) {
+      heading.textContent = sponsors.length > 1 ? heading.dataset.headingMany : heading.dataset.headingOne;
+    }
     block.classList.toggle("hidden", sponsors.length === 0);
   });
   document.querySelectorAll(".sponsors").forEach((section) => {
