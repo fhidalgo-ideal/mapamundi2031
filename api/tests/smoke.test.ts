@@ -1384,19 +1384,33 @@ describe("sponsors", () => {
     // IDEAL (SPONSOR03) is the first one.
     expect((await create({ name: "P2", tier: "principal" })).status).toBe(201);
     expect((await create({ name: "P3", tier: "principal" })).status).toBe(201);
+    const capError = {
+      error: "Ya hay 3 patrocinadores principales visibles. Oculta uno o pásalo a colaborador antes de añadir otro.",
+      field: "tier",
+    };
     const fourth = await create({ name: "P4", tier: "principal" });
     expect(fourth.status).toBe(409);
-    expect((await fourth.json()).field).toBe("tier");
+    expect(await fourth.json()).toEqual(capError);
 
-    // A hidden principal takes no slot, but showing it needs one.
+    // A hidden principal takes no slot, but showing it again needs one.
     const hidden = await create({ name: "P4 oculto", tier: "principal", active: "false" });
     expect(hidden.status).toBe(201);
-    expect((await patch((await hidden.json()).sponsor.id, { active: "true" })).status).toBe(409);
+    const hiddenId = (await hidden.json()).sponsor.id;
+    const show = await patch(hiddenId, { active: "true" });
+    expect(show.status).toBe(409);
+    expect(await show.json()).toEqual(capError);
 
     // Promoting a colaborador is blocked the same way.
     const list = (await (await fetch(`${baseUrl}/api/admin/sponsors`, { headers: auth() })).json()).sponsors;
     const colaborador = list.find((s: { tier: string }) => s.tier === "colaborador");
-    expect((await patch(colaborador.id, { tier: "principal" })).status).toBe(409);
+    const promote = await patch(colaborador.id, { tier: "principal" });
+    expect(promote.status).toBe(409);
+    expect(await promote.json()).toEqual(capError);
+
+    // Neither rejected edit changed anything.
+    const after = (await (await fetch(`${baseUrl}/api/admin/sponsors`, { headers: auth() })).json()).sponsors;
+    expect(after.find((s: { id: string }) => s.id === hiddenId).active).toBe(false);
+    expect(after.find((s: { id: string }) => s.id === colaborador.id).tier).toBe("colaborador");
 
     // Re-saving an active principal doesn't count it against itself.
     const p2 = list.find((s: { name: string }) => s.name === "P2");
