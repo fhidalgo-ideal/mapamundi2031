@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260928-1">
+    <link rel="stylesheet" href="styles.css?v=20260928-2">
   </head>
   <body>
     <header class="topbar" id="topbar">
@@ -211,6 +211,21 @@
             <p class="pullquote-text">Cada foto es un vínculo con Granada, esté donde esté quien la comparte.</p>
           </section>
         </div>
+
+        <!-- Filled from /api/sponsors (managed in the admin panel). Each tier
+             stays hidden until it has a visible sponsor, and the section
+             until at least one tier does. On the cream page background on
+             purpose: the logos are transparent and made for light grounds. -->
+        <section class="sponsors card hidden" id="patrocinadores" aria-label="Patrocinadores">
+          <div class="sponsors-tier sponsors-tier-principal hidden" data-sponsor-tier="principal">
+            <h2 class="sponsors-heading">Patrocinadores principales</h2>
+            <ul class="sponsors-logos"></ul>
+          </div>
+          <div class="sponsors-tier sponsors-tier-colaborador hidden" data-sponsor-tier="colaborador">
+            <h2 class="sponsors-heading">Patrocinan esta iniciativa</h2>
+            <ul class="sponsors-logos"></ul>
+          </div>
+        </section>
 
         <section class="return-ticket card" id="billete-de-vuelta" aria-labelledby="return-ticket-title">
           <div class="concept-inner">
@@ -497,6 +512,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="nav-toggle.js?v=20260925-2"></script>
     <script src="cookie-consent.js?v=20260916-1"></script>
-    <script src="app.js?v=20260925-2"></script>
+    <script src="app.js?v=20260928-1"></script>
   </body>
 </html>

@@ -776,6 +776,54 @@ loadPublicConfig().catch(() => {
   // Si la configuracion publica falla, la portada conserva sus textos por defecto.
 });
 
+function sponsorLogoItem(sponsor) {
+  const item = document.createElement("li");
+  const link = document.createElement("a");
+  link.className = "sponsor-link";
+  // The API only stores http(s) URLs; checked again so a bad row can never
+  // become a javascript: link on the public page.
+  if (/^https?:\/\//i.test(sponsor.url)) link.href = sponsor.url;
+  link.target = "_blank";
+  link.rel = "sponsored nofollow noopener";
+  const logo = document.createElement("img");
+  logo.src = sponsor.logo.src;
+  logo.width = sponsor.logo.width;
+  logo.height = sponsor.logo.height;
+  logo.alt = sponsor.name;
+  logo.loading = "lazy";
+  logo.decoding = "async";
+  const newTab = document.createElement("span");
+  newTab.className = "visually-hidden";
+  newTab.textContent = " (se abre en una pestaña nueva)";
+  link.append(logo, newTab);
+  item.appendChild(link);
+  return item;
+}
+
+// Every [data-sponsor-tier] block on the page gets that tier's logos, so the
+// principal tier can be shown in another zone later just by adding a block
+// there. A block with no visible sponsor stays hidden, and so does a sponsors
+// section whose blocks are all empty.
+function renderSponsors(tiers) {
+  document.querySelectorAll("[data-sponsor-tier]").forEach((block) => {
+    const sponsors = tiers[block.dataset.sponsorTier] || [];
+    block.querySelector(".sponsors-logos").replaceChildren(...sponsors.map(sponsorLogoItem));
+    block.classList.toggle("hidden", sponsors.length === 0);
+  });
+  document.querySelectorAll(".sponsors").forEach((section) => {
+    section.classList.toggle("hidden", !section.querySelector("[data-sponsor-tier]:not(.hidden)"));
+  });
+}
+
+async function loadSponsors() {
+  const { tiers } = await apiRequest("/sponsors");
+  renderSponsors(tiers);
+}
+
+loadSponsors().catch(() => {
+  // Sin patrocinadores la seccion sigue oculta; no es un error visible.
+});
+
 loadTraces().catch((error) => {
   archiveGrid.innerHTML = `<p class="empty-state">${error.message}</p>`;
 });
