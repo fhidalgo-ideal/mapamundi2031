@@ -2900,18 +2900,20 @@ textarea {
 }
 
 /* Three principal logos at their widest still share one row of the 1160px
-   list: 3 x 340 + 2 x 64 = 1148. */
+   list: 3 x 300 + 2 x 64 = 1028. */
 .sponsors-tier-principal {
-  --sponsor-logo-h: 96px;
-  --sponsor-logo-max-w: 340px;
+  --sponsor-logo-h: 88px;
+  --sponsor-logo-max-w: 300px;
   --sponsor-gap-x: 64px;
   --sponsor-gap-y: 40px;
 }
 
+/* Six collaborator logos at their widest still share one row of the 1160px
+   list (6 x 160 + 5 x 40 = 1160), so none is left alone on a second row. */
 .sponsors-tier-colaborador {
-  --sponsor-logo-h: 52px;
-  --sponsor-logo-max-w: 220px;
-  --sponsor-gap-x: 48px;
+  --sponsor-logo-h: 60px;
+  --sponsor-logo-max-w: 160px;
+  --sponsor-gap-x: 40px;
   --sponsor-gap-y: 28px;
 }
 
@@ -2925,14 +2927,14 @@ textarea {
   }
 
   .sponsors-tier-principal {
-    --sponsor-logo-h: 72px;
-    --sponsor-logo-max-w: 280px;
+    --sponsor-logo-h: 64px;
+    --sponsor-logo-max-w: 250px;
     --sponsor-gap-x: 40px;
     --sponsor-gap-y: 28px;
   }
 
   .sponsors-tier-colaborador {
-    --sponsor-logo-h: 44px;
+    --sponsor-logo-h: 50px;
     --sponsor-logo-max-w: 160px;
     --sponsor-gap-x: 28px;
     --sponsor-gap-y: 20px;
@@ -2942,15 +2944,15 @@ textarea {
 @media (max-width: 400px) {
   /* 320px viewport: 320 - 2x12 page margin - 2x18 section padding = 260. */
   .sponsors-tier-principal {
-    --sponsor-logo-h: 60px;
-    --sponsor-logo-max-w: 240px;
+    --sponsor-logo-h: 56px;
+    --sponsor-logo-max-w: 220px;
     --sponsor-gap-x: 28px;
   }
 
   .sponsors-tier-colaborador {
-    --sponsor-logo-h: 38px;
+    --sponsor-logo-h: 40px;
     --sponsor-logo-max-w: 130px;
-    --sponsor-gap-x: 22px;
+    --sponsor-gap-x: 18px;
     --sponsor-gap-y: 18px;
   }
 }
