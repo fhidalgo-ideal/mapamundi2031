@@ -1212,3 +1212,239 @@ describe("smoke", () => {
   });
 
 });
+
+describe("sponsors", () => {
+  let adminToken: string;
+  const auth = () => ({ Authorization: `Bearer ${adminToken}` });
+  type LogoUpload = { bytes: Uint8Array; name: string; type: string };
+
+  // Transparent canvas with an opaque block in the middle, so 75% of the
+  // pixels are fully transparent.
+  async function transparentLogo(format: "png" | "webp", width = 300, height = 100): Promise<Buffer> {
+    const base = sharp({ create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{
+        input: {
+          create: {
+            width: Math.round(width / 2),
+            height: Math.round(height / 2),
+            channels: 4,
+            background: { r: 190, g: 40, b: 40, alpha: 1 },
+          },
+        },
+        gravity: "center",
+      }]);
+    return format === "png" ? base.png().toBuffer() : base.webp({ alphaQuality: 100 }).toBuffer();
+  }
+
+  // Has an alpha channel, but every pixel uses the same alpha (255 = opaque).
+  function uniformAlphaPng(alpha: number): Promise<Buffer> {
+    return sharp({
+      create: { width: 200, height: 80, channels: 4, background: { r: 255, g: 255, b: 255, alpha: alpha / 255 } },
+    })
+      .png()
+      .toBuffer();
+  }
+
+  function sponsorForm(fields: Record<string, string>, logo?: LogoUpload): FormData {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) form.set(key, value);
+    if (logo) form.set("logo", new File([logo.bytes], logo.name, { type: logo.type }));
+    return form;
+  }
+
+  async function create(fields: Record<string, string>, logo?: LogoUpload): Promise<Response> {
+    const upload = logo ?? { bytes: await transparentLogo("png"), name: "logo.png", type: "image/png" };
+    return fetch(`${baseUrl}/api/admin/sponsors`, {
+      method: "POST",
+      headers: auth(),
+      body: sponsorForm({ name: "Empresa", url: "https://empresa.example", tier: "colaborador", ...fields }, upload),
+    });
+  }
+
+  function patch(id: string, fields: Record<string, string>, logo?: LogoUpload): Promise<Response> {
+    return fetch(`${baseUrl}/api/admin/sponsors/${id}`, {
+      method: "PATCH",
+      headers: auth(),
+      body: sponsorForm(fields, logo),
+    });
+  }
+
+  beforeAll(async () => {
+    const response = await fetch(`${baseUrl}/api/admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Forwarded-For": "203.0.113.150" },
+      body: JSON.stringify({ password: "cambia-esta-password" }),
+    });
+    adminToken = (await response.json()).token;
+  });
+
+  test("SPONSOR01: the public listing starts empty, split by tier", async () => {
+    const response = await fetch(`${baseUrl}/api/sponsors`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ tiers: { principal: [], colaborador: [] } });
+  });
+
+  test("SPONSOR02: admin endpoints require auth", async () => {
+    expect((await fetch(`${baseUrl}/api/admin/sponsors`)).status).toBe(401);
+    const post = await fetch(`${baseUrl}/api/admin/sponsors`, { method: "POST", body: sponsorForm({ name: "x" }) });
+    expect(post.status).toBe(401);
+    expect((await fetch(`${baseUrl}/api/admin/sponsors/x`, { method: "PATCH", body: sponsorForm({}) })).status).toBe(401);
+    expect((await fetch(`${baseUrl}/api/admin/sponsors/x`, { method: "DELETE" })).status).toBe(401);
+  });
+
+  test("SPONSOR03: a transparent PNG is stored as PNG with its alpha and served from /uploads/sponsors/", async () => {
+    const response = await create({ name: "IDEAL", url: "www.ideal.es", tier: "principal", position: "1" });
+    expect(response.status).toBe(201);
+    const { sponsor } = await response.json();
+    expect(sponsor.url).toBe("https://www.ideal.es/");
+    expect(sponsor.tier).toBe("principal");
+    expect(sponsor.active).toBe(true);
+    expect(sponsor.logo.src).toMatch(/^\/uploads\/sponsors\/.+\.png$/);
+    expect([sponsor.logo.width, sponsor.logo.height]).toEqual([300, 100]);
+
+    const meta = await sharp(readFileSync(join(dataDir, "uploads", sponsor.logo.src.slice("/uploads/".length)))).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.hasAlpha).toBe(true);
+
+    expect((await fetch(`${baseUrl}${sponsor.logo.src}`)).status).toBe(200);
+  });
+
+  test("SPONSOR04: a transparent WebP stays WebP with alpha, and big logos are scaled down", async () => {
+    const response = await create({ name: "Grande" }, {
+      bytes: await transparentLogo("webp", 1800, 1200),
+      name: "logo.webp",
+      type: "image/webp",
+    });
+    expect(response.status).toBe(201);
+    const { sponsor } = await response.json();
+    expect(sponsor.logo.src).toMatch(/\.webp$/);
+    expect([sponsor.logo.width, sponsor.logo.height]).toEqual([540, 360]);
+    const meta = await sharp(readFileSync(join(dataDir, "uploads", sponsor.logo.src.slice("/uploads/".length)))).metadata();
+    expect(meta.format).toBe("webp");
+    expect(meta.hasAlpha).toBe(true);
+    expect(meta.exif).toBeUndefined();
+  });
+
+  test("SPONSOR05: JPEG, SVG, opaque-with-alpha and near-opaque logos are rejected on the logo field", async () => {
+    const jpeg = await sharp({ create: { width: 200, height: 80, channels: 3, background: "#ffffff" } }).jpeg().toBuffer();
+    const svg = new TextEncoder().encode(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80"></svg>`);
+    const opaque = await uniformAlphaPng(255);
+    const nearlyOpaque = await uniformAlphaPng(254);
+    expect((await sharp(opaque).metadata()).hasAlpha).toBe(true);
+
+    const cases: LogoUpload[] = [
+      { bytes: jpeg, name: "logo.jpg", type: "image/jpeg" },
+      { bytes: jpeg, name: "logo.png", type: "image/png" }, // lies about its type
+      { bytes: svg, name: "logo.svg", type: "image/svg+xml" },
+      { bytes: opaque, name: "opaco.png", type: "image/png" },
+      { bytes: nearlyOpaque, name: "casi-opaco.png", type: "image/png" },
+    ];
+    for (const logo of cases) {
+      const response = await create({ name: "Rechazado" }, logo);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "El logo debe ser PNG o WebP con fondo transparente.",
+        field: "logo",
+      });
+    }
+
+    const missing = await fetch(`${baseUrl}/api/admin/sponsors`, {
+      method: "POST",
+      headers: auth(),
+      body: sponsorForm({ name: "Sin logo", url: "https://x.example", tier: "colaborador" }),
+    });
+    expect(missing.status).toBe(400);
+    expect((await missing.json()).field).toBe("logo");
+  });
+
+  test("SPONSOR06: only http(s) URLs are accepted, and bare hosts get https://", async () => {
+    const rejected = [
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      " javascript:alert(1)",
+      "data:text/html,hola",
+      "ftp://empresa.example",
+      "mailto:a@b.es",
+      "https://user:pw@empresa.example",
+      "",
+    ];
+    for (const url of rejected) {
+      const response = await create({ url });
+      expect(response.status).toBe(400);
+      expect((await response.json()).field).toBe("url");
+    }
+    const withPort = await create({ name: "Puerto", url: "empresa.example:8080/ruta" });
+    expect(withPort.status).toBe(201);
+    expect((await withPort.json()).sponsor.url).toBe("https://empresa.example:8080/ruta");
+    const plainHttp = await create({ name: "Http", url: "HTTP://Empresa.Example" });
+    expect((await plainHttp.json()).sponsor.url).toBe("http://empresa.example/");
+  });
+
+  test("SPONSOR07: at most 3 active principal sponsors, enforced by the API", async () => {
+    // IDEAL (SPONSOR03) is the first one.
+    expect((await create({ name: "P2", tier: "principal" })).status).toBe(201);
+    expect((await create({ name: "P3", tier: "principal" })).status).toBe(201);
+    const fourth = await create({ name: "P4", tier: "principal" });
+    expect(fourth.status).toBe(409);
+    expect((await fourth.json()).field).toBe("tier");
+
+    // A hidden principal takes no slot, but showing it needs one.
+    const hidden = await create({ name: "P4 oculto", tier: "principal", active: "false" });
+    expect(hidden.status).toBe(201);
+    expect((await patch((await hidden.json()).sponsor.id, { active: "true" })).status).toBe(409);
+
+    // Promoting a colaborador is blocked the same way.
+    const list = (await (await fetch(`${baseUrl}/api/admin/sponsors`, { headers: auth() })).json()).sponsors;
+    const colaborador = list.find((s: { tier: string }) => s.tier === "colaborador");
+    expect((await patch(colaborador.id, { tier: "principal" })).status).toBe(409);
+
+    // Re-saving an active principal doesn't count it against itself.
+    const p2 = list.find((s: { name: string }) => s.name === "P2");
+    expect((await patch(p2.id, { name: "P2 renombrado", tier: "principal", active: "true" })).status).toBe(200);
+  });
+
+  test("SPONSOR08: the public listing has active sponsors only, by position then name", async () => {
+    const body = await (await fetch(`${baseUrl}/api/sponsors`)).json();
+    // IDEAL has position 1, the other two 0.
+    expect(body.tiers.principal.map((s: { name: string }) => s.name)).toEqual(["P2 renombrado", "P3", "IDEAL"]);
+    const first = body.tiers.principal[0];
+    expect(Object.keys(first).sort()).toEqual(["id", "logo", "name", "tier", "url"]);
+    expect(Object.keys(first.logo).sort()).toEqual(["height", "src", "width"]);
+    expect(body.tiers.colaborador.length).toBeGreaterThan(0);
+  });
+
+  test("SPONSOR09: replacing a logo writes a new file and drops the old one; delete removes row and file", async () => {
+    const created = (await (await create({ name: "Cambia logo" })).json()).sponsor;
+    const onDisk = (src: string) => join(dataDir, "uploads", src.slice("/uploads/".length));
+    expect(existsSync(onDisk(created.logo.src))).toBe(true);
+
+    const replaced = await patch(created.id, {}, {
+      bytes: await transparentLogo("webp", 400, 200),
+      name: "nuevo.webp",
+      type: "image/webp",
+    });
+    expect(replaced.status).toBe(200);
+    const updated = (await replaced.json()).sponsor;
+    expect(updated.logo.src).not.toBe(created.logo.src);
+    expect([updated.logo.width, updated.logo.height]).toEqual([400, 200]);
+    expect(existsSync(onDisk(created.logo.src))).toBe(false);
+
+    const badLogo = await patch(created.id, {}, { bytes: await uniformAlphaPng(255), name: "opaco.png", type: "image/png" });
+    expect(badLogo.status).toBe(400);
+    expect(existsSync(onDisk(updated.logo.src))).toBe(true);
+
+    const deleted = await fetch(`${baseUrl}/api/admin/sponsors/${created.id}`, { method: "DELETE", headers: auth() });
+    expect(deleted.status).toBe(200);
+    expect(existsSync(onDisk(updated.logo.src))).toBe(false);
+    const again = await fetch(`${baseUrl}/api/admin/sponsors/${created.id}`, { method: "DELETE", headers: auth() });
+    expect(again.status).toBe(404);
+  });
+
+  test("SPONSOR10: every sponsor change lands in the audit log", async () => {
+    const body = await (await fetch(`${baseUrl}/api/admin/audit-log?limit=200`, { headers: auth() })).json();
+    const actions = new Set(body.entries.map((entry: { action: string }) => entry.action));
+    for (const action of ["create_sponsor", "update_sponsor", "delete_sponsor"]) {
+      expect(actions.has(action)).toBe(true);
+    }
+  });
+});

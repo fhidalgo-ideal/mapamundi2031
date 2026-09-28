@@ -18,8 +18,17 @@ import {
   getPhotoById,
   setPhotoPath,
   closeDatabase,
+  listSponsors,
+  getSponsorById,
+  countActivePrincipalSponsors,
+  createSponsor,
+  updateSponsor,
+  deleteSponsor,
   type TraceRecord,
   type TracePhotoRecord,
+  type SponsorRecord,
+  type SponsorTier,
+  type SponsorUpdate,
 } from "./db.ts";
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
@@ -71,6 +80,28 @@ const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/png": ".png",
   "image/webp": ".webp",
 };
+// Sponsor logos: transparent PNG/WebP only, so they sit on the page's cream
+// background instead of showing a white (or any) box around them.
+const SPONSOR_LOGO_TYPES: Record<string, string> = {
+  "image/png": ".png",
+  "image/webp": ".webp",
+};
+const MAX_SPONSOR_LOGO_BYTES = 2 * 1024 * 1024;
+const MAX_SPONSOR_LOGO_DIMENSION = 4000;
+const MIN_SPONSOR_LOGO_DIMENSION = 32;
+// Stored logos are scaled down to this height: about 3x the tallest size the
+// page draws them at, enough for high-density screens without shipping
+// multi-megabyte originals to every visitor.
+const SPONSOR_LOGO_STORED_MAX_HEIGHT = 360;
+// "Real" transparency: at least this share of pixels must be clearly see
+// -through (alpha below the threshold). An alpha channel that is entirely 255
+// — or 254 everywhere — does not count.
+const SPONSOR_LOGO_TRANSPARENT_ALPHA = 128;
+const SPONSOR_LOGO_MIN_TRANSPARENT_RATIO = 0.05;
+const MAX_PRINCIPAL_SPONSORS = 3;
+const SPONSOR_TIERS = new Set<SponsorTier>(["principal", "colaborador"]);
+const SPONSOR_UPLOAD_SUBDIR = "sponsors";
+const SPONSOR_LOGO_FORMAT_ERROR = "El logo debe ser PNG o WebP con fondo transparente.";
 const VALID_EMOTIONS = new Set(["nostalgia", "pertenencia", "asombro", "futuro"]);
 const VALID_STATUSES = new Set(["pending", "approved", "rejected"]);
 
@@ -754,6 +785,12 @@ function errorResponse(message: string, status = 400): Response {
   return jsonResponse({ error: message }, status);
 }
 
+// Same shape as errorResponse plus the form field at fault, so the admin form
+// can show the message next to that field instead of only at the top.
+function fieldErrorResponse(field: string, message: string, status = 400): Response {
+  return jsonResponse({ error: message, field }, status);
+}
+
 function requireAdmin(request: Request): Response | null {
   const authorization = request.headers.get("Authorization") ?? "";
   const prefix = "Bearer ";
@@ -820,7 +857,8 @@ async function handleGeocodeSearch(
 
 // Best-effort audit trail: an admin action must still succeed even if this
 // insert somehow throws, since losing an audit entry is preferable to
-// failing the action it is meant to record.
+// failing the action it is meant to record. traceId is the id of whatever the
+// action touched: a trace, or a sponsor for the *_sponsor actions.
 async function recordAuditLog(action: string, traceId: string | null, sourceIp: string): Promise<void> {
   try {
     await addAuditLog(randomUUID(), action, traceId, sourceIp, nowIso());
@@ -1483,6 +1521,320 @@ async function handleSelfDeleteTrace(request: Request, traceId: string): Promise
   return jsonResponse({ deleted: true, id: traceId });
 }
 
+// --- Sponsors --------------------------------------------------------------
+
+// Anything that looks like "scheme:" (letters/digits/+/-, no dots) counts as
+// an explicit scheme and must be http(s); without one the admin typed a bare
+// host such as www.empresa.com, which gets https:// in front. Dots are left
+// out of the scheme pattern on purpose so "www.empresa.com:8080" is read as
+// a host with a port, not as a scheme called "www.empresa.com".
+const EXPLICIT_SCHEME_PATTERN = /^[a-z][a-z0-9+-]*:/i;
+
+function normalizeSponsorUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length > 500) return null;
+  const candidate = EXPLICIT_SCHEME_PATTERN.test(trimmed) ? trimmed : `https://${trimmed.replace(/^\/+/, "")}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  if (!parsed.hostname || parsed.username || parsed.password) return null;
+  return parsed.href;
+}
+
+// Validates a sponsor logo and stores it ready to serve: PNG or WebP (by
+// signature, whatever the browser claims), header-checked dimensions before
+// any decode, real transparency, then scaled to SPONSOR_LOGO_STORED_MAX_HEIGHT
+// and re-encoded IN THE SAME FORMAT — never to JPEG, which has no alpha.
+// Re-encoding also drops EXIF and every other metadata chunk.
+async function processSponsorLogo(
+  file: File,
+): Promise<{ bytes: Buffer; extension: string; width: number; height: number } | { error: Response }> {
+  if (file.size > MAX_SPONSOR_LOGO_BYTES) {
+    return { error: fieldErrorResponse("logo", "El logo supera el límite de 2 MB.", 413) };
+  }
+  const data = new Uint8Array(await file.arrayBuffer());
+  const kind = sniffImageSignature(data);
+  if (!kind || !SPONSOR_LOGO_TYPES[kind]) {
+    return { error: fieldErrorResponse("logo", SPONSOR_LOGO_FORMAT_ERROR) };
+  }
+
+  const [headerWidth, headerHeight] = readImageDimensions(data, kind);
+  if (headerWidth <= 0 || headerHeight <= 0) {
+    return { error: fieldErrorResponse("logo", SPONSOR_LOGO_FORMAT_ERROR) };
+  }
+  if (headerWidth > MAX_SPONSOR_LOGO_DIMENSION || headerHeight > MAX_SPONSOR_LOGO_DIMENSION) {
+    return {
+      error: fieldErrorResponse(
+        "logo",
+        `El logo no puede superar ${MAX_SPONSOR_LOGO_DIMENSION}x${MAX_SPONSOR_LOGO_DIMENSION} px.`,
+        413,
+      ),
+    };
+  }
+  if (headerWidth < MIN_SPONSOR_LOGO_DIMENSION || headerHeight < MIN_SPONSOR_LOGO_DIMENSION) {
+    return {
+      error: fieldErrorResponse(
+        "logo",
+        `El logo debe medir al menos ${MIN_SPONSOR_LOGO_DIMENSION}x${MIN_SPONSOR_LOGO_DIMENSION} px.`,
+      ),
+    };
+  }
+
+  const limitInputPixels = MAX_SPONSOR_LOGO_DIMENSION * MAX_SPONSOR_LOGO_DIMENSION;
+  try {
+    const meta = await sharp(data, { limitInputPixels }).metadata();
+    // Animated WebP/APNG would be flattened to its first frame; reject instead.
+    if (!meta.hasAlpha || (meta.pages ?? 1) > 1) {
+      return { error: fieldErrorResponse("logo", SPONSOR_LOGO_FORMAT_ERROR) };
+    }
+
+    // Sample the alpha channel on a reduced copy. Nearest-neighbour keeps
+    // alpha values as they are instead of averaging edges into new ones.
+    const { data: pixels, info } = await sharp(data, { limitInputPixels })
+      .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true, kernel: "nearest" })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const alphaIndex = info.channels - 1;
+    let transparent = 0;
+    for (let i = alphaIndex; i < pixels.length; i += info.channels) {
+      if (pixels[i] < SPONSOR_LOGO_TRANSPARENT_ALPHA) transparent++;
+    }
+    if (transparent / (info.width * info.height) < SPONSOR_LOGO_MIN_TRANSPARENT_RATIO) {
+      return { error: fieldErrorResponse("logo", SPONSOR_LOGO_FORMAT_ERROR) };
+    }
+
+    const pipeline = sharp(data, { limitInputPixels })
+      .rotate()
+      .resize({ height: SPONSOR_LOGO_STORED_MAX_HEIGHT, withoutEnlargement: true });
+    const encoded =
+      kind === "image/png"
+        ? pipeline.png({ compressionLevel: 9 })
+        : pipeline.webp({ quality: 90, alphaQuality: 100 });
+    const { data: bytes, info: out } = await encoded.toBuffer({ resolveWithObject: true });
+    return { bytes, extension: SPONSOR_LOGO_TYPES[kind], width: out.width, height: out.height };
+  } catch {
+    return { error: fieldErrorResponse("logo", SPONSOR_LOGO_FORMAT_ERROR) };
+  }
+}
+
+// New file name on every upload: /uploads/ is served "immutable" for 30 days,
+// so replacing a logo in place would keep showing the old one.
+async function writeSponsorLogo(sponsorId: string, logo: { bytes: Buffer; extension: string }): Promise<string> {
+  const fileName = `${sponsorId}-${Date.now().toString(36)}${logo.extension}`;
+  mkdirSync(join(UPLOAD_DIR, SPONSOR_UPLOAD_SUBDIR), { recursive: true });
+  await Bun.write(join(UPLOAD_DIR, SPONSOR_UPLOAD_SUBDIR, fileName), logo.bytes);
+  return `/uploads/${SPONSOR_UPLOAD_SUBDIR}/${fileName}`;
+}
+
+function sponsorToPublic(sponsor: SponsorRecord) {
+  return {
+    id: sponsor.id,
+    name: sponsor.name,
+    url: sponsor.url,
+    tier: sponsor.tier,
+    logo: { src: sponsor.logo, width: sponsor.logo_width, height: sponsor.logo_height },
+  };
+}
+
+function sponsorToAdmin(sponsor: SponsorRecord) {
+  return {
+    ...sponsorToPublic(sponsor),
+    position: sponsor.position,
+    active: sponsor.active,
+    createdAt: sponsor.created_at,
+    updatedAt: sponsor.updated_at,
+  };
+}
+
+// Grouped by tier rather than by page zone, so the page (or a future second
+// zone) picks which tier to draw where without the API changing.
+async function handleGetSponsors(): Promise<Response> {
+  const tiers: Record<SponsorTier, ReturnType<typeof sponsorToPublic>[]> = { principal: [], colaborador: [] };
+  for (const sponsor of await listSponsors(true)) {
+    tiers[sponsor.tier].push(sponsorToPublic(sponsor));
+  }
+  return jsonResponse({ tiers });
+}
+
+async function handleGetAdminSponsors(): Promise<Response> {
+  const sponsors = await listSponsors(false);
+  return jsonResponse({ sponsors: sponsors.map(sponsorToAdmin), maxPrincipal: MAX_PRINCIPAL_SPONSORS });
+}
+
+function parseFormBoolean(value: string): boolean | null {
+  const normalized = value.trim().toLowerCase();
+  if (["true", "on", "1"].includes(normalized)) return true;
+  if (["false", "off", "0"].includes(normalized)) return false;
+  return null;
+}
+
+// Reads the text fields of a create/update form. On create every field but
+// position/active is required; on update only the fields present change.
+function parseSponsorFields(form: FormData, isCreate: boolean): SponsorUpdate | Response {
+  const fields: SponsorUpdate = {};
+  const has = (key: string) => form.has(key);
+
+  if (isCreate || has("name")) {
+    const name = String(form.get("name") ?? "").trim();
+    if (!name) return fieldErrorResponse("name", "Indica el nombre del patrocinador.");
+    if (name.length > 120) return fieldErrorResponse("name", "El nombre no puede superar 120 caracteres.");
+    fields.name = name;
+  }
+  if (isCreate || has("url")) {
+    const url = normalizeSponsorUrl(String(form.get("url") ?? ""));
+    if (!url) {
+      return fieldErrorResponse("url", "La web debe ser una dirección http:// o https:// válida.");
+    }
+    fields.url = url;
+  }
+  if (isCreate || has("tier")) {
+    const tier = String(form.get("tier") ?? "") as SponsorTier;
+    if (!SPONSOR_TIERS.has(tier)) return fieldErrorResponse("tier", "Elige un nivel: principal o colaborador.");
+    fields.tier = tier;
+  }
+  if (has("position")) {
+    const raw = String(form.get("position") ?? "").trim();
+    const position = raw === "" ? 0 : Number(raw);
+    if (!Number.isInteger(position) || position < 0 || position > 9999) {
+      return fieldErrorResponse("position", "El orden debe ser un número entero entre 0 y 9999.");
+    }
+    fields.position = position;
+  } else if (isCreate) {
+    fields.position = 0;
+  }
+  if (has("active")) {
+    const active = parseFormBoolean(String(form.get("active") ?? ""));
+    if (active === null) return fieldErrorResponse("active", "Valor de visibilidad no válido.");
+    fields.active = active;
+  } else if (isCreate) {
+    fields.active = true;
+  }
+  return fields;
+}
+
+async function readSponsorForm(request: Request): Promise<FormData | Response> {
+  const contentLength = Number(request.headers.get("Content-Length") ?? "0");
+  if (contentLength > MAX_SPONSOR_LOGO_BYTES + 64 * 1024) {
+    return fieldErrorResponse("logo", "El logo supera el límite de 2 MB.", 413);
+  }
+  if (!(request.headers.get("Content-Type") ?? "").includes("multipart/form-data")) {
+    return errorResponse("El formulario debe enviarse como multipart/form-data.");
+  }
+  try {
+    return await request.formData();
+  } catch {
+    return errorResponse("La petición no contiene datos.");
+  }
+}
+
+function uploadedFile(form: FormData, key: string): File | null {
+  const entry = form.get(key);
+  return entry instanceof File && entry.size > 0 ? entry : null;
+}
+
+// The cap is enforced here, not only in the admin UI: a sponsor that would
+// end up active AND principal needs a free slot among the other sponsors.
+async function principalSlotError(tier: SponsorTier, active: boolean, excludeId?: string): Promise<Response | null> {
+  if (tier !== "principal" || !active) return null;
+  if ((await countActivePrincipalSponsors(excludeId)) < MAX_PRINCIPAL_SPONSORS) return null;
+  return fieldErrorResponse(
+    "tier",
+    `Ya hay ${MAX_PRINCIPAL_SPONSORS} patrocinadores principales visibles. Oculta uno o pásalo a colaborador antes de añadir otro.`,
+    409,
+  );
+}
+
+async function handleCreateSponsor(request: Request, server?: IpResolvingServer): Promise<Response> {
+  const form = await readSponsorForm(request);
+  if (form instanceof Response) return form;
+  const fields = parseSponsorFields(form, true);
+  if (fields instanceof Response) return fields;
+
+  const file = uploadedFile(form, "logo");
+  if (!file) return fieldErrorResponse("logo", "Sube el logo del patrocinador.");
+  const logo = await processSponsorLogo(file);
+  if ("error" in logo) return logo.error;
+
+  const slotError = await principalSlotError(fields.tier!, fields.active!);
+  if (slotError) return slotError;
+
+  const id = randomUUID();
+  const now = nowIso();
+  const sponsor: SponsorRecord = {
+    id,
+    name: fields.name!,
+    url: fields.url!,
+    tier: fields.tier!,
+    position: fields.position!,
+    active: fields.active!,
+    logo: await writeSponsorLogo(id, logo),
+    logo_width: logo.width,
+    logo_height: logo.height,
+    created_at: now,
+    updated_at: now,
+  };
+  try {
+    await createSponsor(sponsor);
+  } catch (error) {
+    unlinkUploadFile(sponsor.logo);
+    throw error;
+  }
+  await recordAuditLog("create_sponsor", id, getClientIp(request, server));
+  return jsonResponse({ sponsor: sponsorToAdmin(sponsor) }, 201);
+}
+
+async function handleUpdateSponsor(request: Request, sponsorId: string, server?: IpResolvingServer): Promise<Response> {
+  const existing = await getSponsorById(sponsorId);
+  if (!existing) return errorResponse("No existe ese patrocinador.", 404);
+  const form = await readSponsorForm(request);
+  if (form instanceof Response) return form;
+  const fields = parseSponsorFields(form, false);
+  if (fields instanceof Response) return fields;
+
+  const file = uploadedFile(form, "logo");
+  const logo = file ? await processSponsorLogo(file) : null;
+  if (logo && "error" in logo) return logo.error;
+  if (!logo && Object.keys(fields).length === 0) {
+    return errorResponse("No hay cambios que guardar.");
+  }
+
+  const slotError = await principalSlotError(
+    fields.tier ?? existing.tier,
+    fields.active ?? existing.active,
+    sponsorId,
+  );
+  if (slotError) return slotError;
+
+  const updates: SponsorUpdate = { ...fields, updated_at: nowIso() };
+  if (logo) {
+    updates.logo = await writeSponsorLogo(sponsorId, logo);
+    updates.logo_width = logo.width;
+    updates.logo_height = logo.height;
+  }
+  if (!(await updateSponsor(sponsorId, updates))) {
+    if (updates.logo) unlinkUploadFile(updates.logo);
+    return errorResponse("No existe ese patrocinador.", 404);
+  }
+  if (updates.logo) unlinkUploadFile(existing.logo);
+
+  await recordAuditLog("update_sponsor", sponsorId, getClientIp(request, server));
+  const sponsor = await getSponsorById(sponsorId);
+  return jsonResponse({ sponsor: sponsorToAdmin(sponsor!) });
+}
+
+async function handleDeleteSponsor(request: Request, sponsorId: string, server?: IpResolvingServer): Promise<Response> {
+  const deleted = await deleteSponsor(sponsorId);
+  if (!deleted) return errorResponse("No existe ese patrocinador.", 404);
+  unlinkUploadFile(deleted.logo);
+  await recordAuditLog("delete_sponsor", sponsorId, getClientIp(request, server));
+  return jsonResponse({ deleted: true, id: sponsorId });
+}
+
 // Explicit allowlist: every URL below maps to one specific on-disk folder, so
 // the backend source under api/, the .dev secrets file, and everything else in
 // ROOT_DIR stays unreachable just by virtue of living in the project directory.
@@ -1590,6 +1942,14 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
     if (path === "/api/traces") {
       return handleGetTraces();
     }
+    if (normalizedPath === "/api/sponsors") {
+      return handleGetSponsors();
+    }
+    if (normalizedPath === "/api/admin/sponsors") {
+      const denied = requireAdmin(request);
+      if (denied) return denied;
+      return handleGetAdminSponsors();
+    }
     if (normalizedPath === "/api/geocode/search") {
       return handleGeocodeSearch(request, server);
     }
@@ -1625,6 +1985,11 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
     if (normalizedPath === "/api/notify-signup") {
       return handleNotifySignup(request, server);
     }
+    if (normalizedPath === "/api/admin/sponsors") {
+      const denied = requireAdmin(request);
+      if (denied) return denied;
+      return handleCreateSponsor(request, server);
+    }
     if (normalizedPath.startsWith("/api/admin/photos/") && normalizedPath.endsWith("/rotate")) {
       const denied = requireAdmin(request);
       if (denied) return denied;
@@ -1654,6 +2019,12 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
       const traceId = normalizedPath.slice("/api/admin/traces/".length);
       return handleUpdateTrace(request, traceId, server);
     }
+    if (normalizedPath.startsWith("/api/admin/sponsors/")) {
+      const denied = requireAdmin(request);
+      if (denied) return denied;
+      const sponsorId = normalizedPath.slice("/api/admin/sponsors/".length);
+      return handleUpdateSponsor(request, sponsorId, server);
+    }
     if (path.startsWith("/api/")) {
       return errorResponse("Endpoint de API no encontrado.", 404);
     }
@@ -1666,6 +2037,12 @@ async function handleRequest(request: Request, server?: IpResolvingServer): Prom
       if (denied) return denied;
       const traceId = normalizedPath.slice("/api/admin/traces/".length);
       return handleDeleteTrace(request, traceId, server);
+    }
+    if (normalizedPath.startsWith("/api/admin/sponsors/")) {
+      const denied = requireAdmin(request);
+      if (denied) return denied;
+      const sponsorId = normalizedPath.slice("/api/admin/sponsors/".length);
+      return handleDeleteSponsor(request, sponsorId, server);
     }
     if (normalizedPath.startsWith("/api/traces/")) {
       const traceId = normalizedPath.slice("/api/traces/".length);
