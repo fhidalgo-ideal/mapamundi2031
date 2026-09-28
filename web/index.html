@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260925-11">
+    <link rel="stylesheet" href="styles.css?v=20260925-12">
   </head>
   <body>
     <header class="topbar" id="topbar">
@@ -325,7 +325,7 @@
               <img class="footer-logo hidden" id="idealLogo" alt="IDEAL">
               <span class="footer-logo-fallback" id="idealLogoFallback">IDEAL</span>
             </a>
-            <!-- Editable from the admin (config.footer_text). -->
+            <!-- Set from config.json (public.footer_text); this is the fallback. -->
             <p class="footer-tagline" id="footerText">Un proyecto de IDEAL para una Granada más abierta al mundo.</p>
           </div>
           <nav class="footer-links" aria-label="Enlaces legales">
@@ -435,7 +435,10 @@
         </div>
         <label class="consent wide">
           <input name="consent" type="checkbox" required>
-          <span id="consentText">Acepto que esta fotografía y el texto se usen en la acción cultural Granada 2031.</span>
+          <!-- Legal wording lives only here, on purpose: it is not overridable
+               from config.json. The server still rejects a submission without
+               consent, independently of this required checkbox. -->
+          <span>Confirmo que soy <strong>mayor de edad</strong>, que ostento <strong>todos los derechos de propiedad intelectual e imagen</strong> sobre las fotografías y textos aportados y acepto su <strong>cesión gratuita para la acción cultural Granada 2031</strong>. He leído y acepto la <a id="consentPrivacyLink" href="https://2031granadaideal.es/politica-de-privacidad/" target="_blank" rel="noopener">política de privacidad<span class="visually-hidden"> (se abre en una pestaña nueva)</span></a>.</span>
         </label>
         <label class="hp-field wide" aria-hidden="true">
           Sitio web
@@ -494,6 +497,6 @@
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="nav-toggle.js?v=20260925-2"></script>
     <script src="cookie-consent.js?v=20260916-1"></script>
-    <script src="app.js?v=20260925-1"></script>
+    <script src="app.js?v=20260925-2"></script>
   </body>
 </html>
