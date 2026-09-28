@@ -31,6 +31,16 @@ const votesPager = document.querySelector("#votesPager");
 const PAGE_SIZE = 10;
 let reviewPage = 1;
 let votesPage = 1;
+const sponsorsPanel = document.querySelector("#adminSponsors");
+const sponsorForm = document.querySelector("#sponsorForm");
+const sponsorFormTitle = document.querySelector("#sponsorFormTitle");
+const sponsorFormStatus = document.querySelector("#sponsorFormStatus");
+const sponsorSubmit = document.querySelector("#sponsorSubmit");
+const sponsorCancel = document.querySelector("#sponsorCancel");
+const sponsorPreview = document.querySelector("#sponsorPreview");
+const sponsorAdminList = document.querySelector("#sponsorAdminList");
+let adminSponsors = [];
+let editingSponsorId = null;
 
 async function apiRequest(path, options = {}) {
   let response;
@@ -47,7 +57,10 @@ async function apiRequest(path, options = {}) {
     const message = typeof payload === "object" && payload.error
       ? payload.error
       : `La API no respondio correctamente (${response.status}).`;
-    throw new Error(message);
+    const error = new Error(message);
+    // Form endpoints name the field at fault so the form can flag it in place.
+    error.field = typeof payload === "object" ? payload.field : undefined;
+    throw error;
   }
 
   return payload;
@@ -67,6 +80,7 @@ async function loadAdminTraces() {
   });
   adminTraces = payload.traces;
   renderAdmin();
+  await loadAdminSponsors();
 }
 
 function renderAdmin() {
@@ -74,6 +88,7 @@ function renderAdmin() {
   adminLoginForm.classList.toggle("hidden", Boolean(adminToken));
   adminLogout.classList.toggle("hidden", !adminToken);
   adminQuickLinks.classList.toggle("hidden", !adminToken);
+  sponsorsPanel.classList.toggle("hidden", !adminToken);
   renderReviewList();
   renderCharts();
   renderVotes();
@@ -593,6 +608,240 @@ async function deleteTrace(trace) {
   }
 }
 
+// --- Patrocinadores ---------------------------------------------------------
+
+const SPONSOR_LOGO_TYPES = ["image/png", "image/webp"];
+const SPONSOR_LOGO_FORMAT_ERROR = "El logo debe ser PNG o WebP con fondo transparente.";
+const SPONSOR_TIER_LABELS = { principal: "Principal", colaborador: "Colaborador" };
+
+async function loadAdminSponsors() {
+  if (!adminToken) {
+    adminSponsors = [];
+    renderSponsorList();
+    return;
+  }
+  const payload = await apiRequest("/admin/sponsors", {
+    headers: { Authorization: `Bearer ${adminToken}` }
+  });
+  adminSponsors = payload.sponsors;
+  document.querySelector("#sponsorMaxPrincipal").textContent = payload.maxPrincipal;
+  renderSponsorList();
+}
+
+function renderSponsorList() {
+  document.querySelector("#sponsorPrincipalCount").textContent = adminSponsors
+    .filter((sponsor) => sponsor.tier === "principal" && sponsor.active).length;
+  sponsorAdminList.innerHTML = "";
+  if (adminSponsors.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "sponsor-admin-empty";
+    empty.textContent = "Todavía no hay patrocinadores. La sección no se muestra en la web hasta que haya alguno visible.";
+    sponsorAdminList.appendChild(empty);
+    return;
+  }
+
+  adminSponsors.forEach((sponsor) => {
+    const item = document.createElement("article");
+    item.className = "sponsor-admin-item";
+    item.classList.toggle("is-hidden", !sponsor.active);
+
+    const logoBox = document.createElement("div");
+    logoBox.className = "sponsor-logo-box";
+    const logo = document.createElement("img");
+    logo.src = sponsor.logo.src;
+    logo.width = sponsor.logo.width;
+    logo.height = sponsor.logo.height;
+    logo.alt = sponsor.name;
+    logoBox.appendChild(logo);
+
+    const info = document.createElement("div");
+    const badges = document.createElement("p");
+    badges.className = "sponsor-badges";
+    const tier = document.createElement("span");
+    tier.className = `status-badge sponsor-tier-${sponsor.tier}`;
+    tier.textContent = SPONSOR_TIER_LABELS[sponsor.tier];
+    const visibility = document.createElement("span");
+    visibility.className = `status-badge ${sponsor.active ? "approved" : "rejected"}`;
+    visibility.textContent = sponsor.active ? "Visible" : "Oculto";
+    badges.append(tier, visibility);
+    const name = document.createElement("h3");
+    name.textContent = sponsor.name;
+    const link = document.createElement("a");
+    link.href = sponsor.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = sponsor.url;
+    const order = document.createElement("small");
+    order.textContent = `Orden ${sponsor.position}`;
+    info.append(badges, name, link, order);
+
+    const actions = document.createElement("div");
+    actions.className = "review-actions";
+    const edit = document.createElement("button");
+    edit.className = "button ghost";
+    edit.type = "button";
+    edit.textContent = "Editar";
+    edit.addEventListener("click", () => startSponsorEdit(sponsor));
+    const toggle = document.createElement("button");
+    toggle.className = "button ghost";
+    toggle.type = "button";
+    toggle.textContent = sponsor.active ? "Ocultar" : "Mostrar";
+    toggle.addEventListener("click", () => setSponsorActive(sponsor, !sponsor.active));
+    const remove = document.createElement("button");
+    remove.className = "button danger";
+    remove.type = "button";
+    remove.textContent = "Borrar";
+    remove.addEventListener("click", () => deleteSponsor(sponsor));
+    actions.append(edit, toggle, remove);
+
+    item.append(logoBox, info, actions);
+    sponsorAdminList.appendChild(item);
+  });
+}
+
+function clearSponsorErrors() {
+  sponsorForm.querySelectorAll("[data-error-for]").forEach((slot) => { slot.textContent = ""; });
+  sponsorForm.querySelectorAll("[aria-invalid]").forEach((field) => field.removeAttribute("aria-invalid"));
+  sponsorFormStatus.textContent = "";
+}
+
+// Puts the message next to its field when the API names one; otherwise (or
+// for a field the form doesn't have) under the form.
+function showSponsorError(error) {
+  const slot = error.field && sponsorForm.querySelector(`[data-error-for="${error.field}"]`);
+  if (!slot) {
+    sponsorFormStatus.textContent = error.message;
+    return;
+  }
+  slot.textContent = error.message;
+  const field = sponsorForm.elements[error.field];
+  if (field) {
+    field.setAttribute("aria-invalid", "true");
+    field.focus();
+  }
+}
+
+function showSponsorPreview(src) {
+  const img = sponsorPreview.querySelector("img");
+  if (src) img.src = src;
+  else img.removeAttribute("src");
+  sponsorPreview.classList.toggle("hidden", !src);
+}
+
+function resetSponsorForm() {
+  editingSponsorId = null;
+  sponsorForm.reset();
+  clearSponsorErrors();
+  showSponsorPreview(null);
+  sponsorFormTitle.textContent = "Añadir patrocinador";
+  sponsorSubmit.textContent = "Añadir";
+  sponsorCancel.classList.add("hidden");
+}
+
+function startSponsorEdit(sponsor) {
+  resetSponsorForm();
+  editingSponsorId = sponsor.id;
+  sponsorForm.elements.name.value = sponsor.name;
+  sponsorForm.elements.url.value = sponsor.url;
+  sponsorForm.elements.tier.value = sponsor.tier;
+  sponsorForm.elements.position.value = sponsor.position;
+  sponsorForm.elements.active.checked = sponsor.active;
+  showSponsorPreview(sponsor.logo.src);
+  sponsorFormTitle.textContent = `Editar ${sponsor.name}`;
+  sponsorSubmit.textContent = "Guardar cambios";
+  sponsorCancel.classList.remove("hidden");
+  sponsorForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Shows the chosen file right away on the page's own cream background. Only
+// the format is checked here; transparency is checked by the API, which is
+// the one that decides. Read as a data: URL because the CSP (img-src 'self'
+// data:) blocks blob: object URLs.
+sponsorForm.elements.logo.addEventListener("change", () => {
+  clearSponsorErrors();
+  const file = sponsorForm.elements.logo.files[0];
+  if (!file) {
+    const current = adminSponsors.find((sponsor) => sponsor.id === editingSponsorId);
+    showSponsorPreview(current ? current.logo.src : null);
+    return;
+  }
+  if (!SPONSOR_LOGO_TYPES.includes(file.type)) {
+    showSponsorPreview(null);
+    showSponsorError({ field: "logo", message: SPONSOR_LOGO_FORMAT_ERROR });
+    return;
+  }
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    // Ignore a slow read that finished after the admin picked another file.
+    if (sponsorForm.elements.logo.files[0] === file) showSponsorPreview(reader.result);
+  });
+  reader.readAsDataURL(file);
+});
+
+sponsorForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearSponsorErrors();
+  const data = new FormData();
+  data.set("name", sponsorForm.elements.name.value);
+  data.set("url", sponsorForm.elements.url.value);
+  data.set("tier", sponsorForm.elements.tier.value);
+  data.set("position", sponsorForm.elements.position.value);
+  data.set("active", sponsorForm.elements.active.checked ? "true" : "false");
+  const file = sponsorForm.elements.logo.files[0];
+  if (file) data.set("logo", file);
+
+  const editing = editingSponsorId;
+  sponsorSubmit.disabled = true;
+  try {
+    await apiRequest(editing ? `/admin/sponsors/${editing}` : "/admin/sponsors", {
+      method: editing ? "PATCH" : "POST",
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: data
+    });
+    resetSponsorForm();
+    sponsorFormStatus.textContent = editing ? "Patrocinador actualizado." : "Patrocinador añadido.";
+    await loadAdminSponsors();
+  } catch (error) {
+    showSponsorError(error);
+  } finally {
+    sponsorSubmit.disabled = false;
+  }
+});
+
+sponsorCancel.addEventListener("click", resetSponsorForm);
+
+async function setSponsorActive(sponsor, active) {
+  const data = new FormData();
+  data.set("active", active ? "true" : "false");
+  try {
+    await apiRequest(`/admin/sponsors/${sponsor.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: data
+    });
+    sponsorFormStatus.textContent = active ? `${sponsor.name} ya se muestra en la web.` : `${sponsor.name} queda oculto.`;
+    await loadAdminSponsors();
+  } catch (error) {
+    sponsorFormStatus.textContent = error.message;
+  }
+}
+
+async function deleteSponsor(sponsor) {
+  const confirmed = window.confirm(`Borrar definitivamente el patrocinador ${sponsor.name} y su logo? Esta accion no se puede deshacer.`);
+  if (!confirmed) return;
+  try {
+    await apiRequest(`/admin/sponsors/${sponsor.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    if (editingSponsorId === sponsor.id) resetSponsorForm();
+    sponsorFormStatus.textContent = "Patrocinador borrado.";
+    await loadAdminSponsors();
+  } catch (error) {
+    sponsorFormStatus.textContent = error.message;
+  }
+}
+
 adminLoginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const data = new FormData(adminLoginForm);
@@ -617,6 +866,8 @@ adminLoginForm.addEventListener("submit", async (event) => {
 adminLogout.addEventListener("click", () => {
   adminToken = "";
   adminTraces = [];
+  adminSponsors = [];
+  resetSponsorForm();
   sessionStorage.removeItem("granada2031.adminToken");
   adminStatus.textContent = "Sesion cerrada.";
   renderAdmin();

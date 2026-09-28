@@ -2108,6 +2108,162 @@ textarea {
   margin-bottom: 24px;
 }
 
+/* Admin "Patrocinadores": form + list. Every logo sits on the page's own
+   cream (--bg-light) so the admin sees exactly how it will look in the web. */
+.sponsors-panel {
+  margin-top: 24px;
+}
+
+.sponsors-admin-hint {
+  color: var(--muted);
+  margin: 8px 0 20px;
+}
+
+.sponsor-form {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sponsor-form h3 {
+  margin: 0;
+}
+
+.sponsor-form input[type="file"] {
+  min-height: 0;
+}
+
+.sponsor-form [aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.sponsor-active {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.sponsor-active input {
+  min-height: 0;
+}
+
+.field-error {
+  color: #ffb4b4;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field-error:empty {
+  display: none;
+}
+
+.sponsor-form-status {
+  color: var(--muted);
+  margin: 0;
+}
+
+.sponsor-preview {
+  background: var(--bg-light);
+  border-radius: 8px;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+}
+
+.sponsor-preview img {
+  display: inline-block;
+  height: 96px;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
+}
+
+.sponsor-preview figcaption {
+  color: var(--muted-on-light);
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+.sponsor-admin-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.sponsor-admin-item {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.sponsor-admin-item.is-hidden .sponsor-logo-box {
+  opacity: 0.45;
+}
+
+.sponsor-logo-box {
+  align-items: center;
+  background: var(--bg-light);
+  border-radius: 6px;
+  display: flex;
+  height: 84px;
+  justify-content: center;
+  padding: 10px;
+}
+
+.sponsor-logo-box img {
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
+}
+
+.sponsor-admin-item h3 {
+  margin: 4px 0;
+}
+
+.sponsor-admin-item a {
+  color: var(--gold);
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.sponsor-admin-item small,
+.sponsor-admin-empty {
+  color: var(--muted);
+}
+
+.sponsor-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.sponsor-badges .status-badge {
+  margin-bottom: 0;
+}
+
+.status-badge.sponsor-tier-principal {
+  background: rgba(242, 149, 74, 0.2);
+  color: var(--accent-bright);
+}
+
+.status-badge.sponsor-tier-colaborador {
+  background: rgba(92, 120, 180, 0.25);
+  color: #c9d6f5;
+}
+
+@media (max-width: 760px) {
+  .sponsor-form,
+  .sponsor-admin-item {
+    grid-template-columns: 1fr;
+  }
+}
+
 .votes-list {
   display: grid;
   gap: 10px;
