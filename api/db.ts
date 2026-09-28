@@ -83,6 +83,29 @@ export interface NotifySignupRecord {
   created_at: string;
 }
 
+// tier says how important a sponsor is, not where it is drawn: the public
+// page decides which zone renders each tier, so moving "principal" somewhere
+// else later is a frontend change, not a schema one. logo_width/logo_height
+// are the stored file's real pixel size, so any zone can declare width/height
+// on the <img> and avoid layout shift.
+export type SponsorTier = "principal" | "colaborador";
+
+export interface SponsorRecord {
+  id: string;
+  name: string;
+  url: string;
+  tier: SponsorTier;
+  position: number;
+  active: boolean;
+  logo: string;
+  logo_width: number;
+  logo_height: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SponsorUpdate = Partial<Omit<SponsorRecord, "id" | "created_at">>;
+
 // Seed traces: inserted when database is empty (same behavior as initDb() in server.ts).
 // deletion_token_hash is NULL for all seed rows (as required by smoke tests).
 interface SeedTrace {
@@ -192,6 +215,7 @@ let tracePhotosCollection: Collection | null = null;
 let auditLogCollection: Collection | null = null;
 let notifySignupsCollection: Collection | null = null;
 let photoVotesCollection: Collection | null = null;
+let sponsorsCollection: Collection | null = null;
 
 /**
  * Initialize the database with either SQLite (when mongoUri is unset) or MongoDB.
@@ -223,12 +247,16 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
     await mongoDb
       .collection("photo_votes")
       .createIndex({ photo_id: 1, ip_hash: 1 }, { unique: true });
+    // Same indexes as migrations/0003-add-sponsors.ts.
+    await mongoDb.collection("sponsors").createIndex({ id: 1 }, { unique: true });
+    await mongoDb.collection("sponsors").createIndex({ active: 1, tier: 1, position: 1 });
 
     tracesCollection = mongoDb.collection("traces");
     tracePhotosCollection = mongoDb.collection("trace_photos");
     auditLogCollection = mongoDb.collection("audit_log");
     notifySignupsCollection = mongoDb.collection("notify_signups");
     photoVotesCollection = mongoDb.collection("photo_votes");
+    sponsorsCollection = mongoDb.collection("sponsors");
 
     backend = "mongodb";
 
@@ -354,6 +382,23 @@ export async function initDatabase(sqlitePath: string, mongoUri?: string): Promi
         PRIMARY KEY (photo_id, ip_hash)
       )
     `);
+
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS sponsors (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        tier TEXT NOT NULL CHECK(tier IN ('principal', 'colaborador')),
+        position INTEGER NOT NULL DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1,
+        logo TEXT NOT NULL,
+        logo_width INTEGER NOT NULL,
+        logo_height INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+    sqliteDb.exec("CREATE INDEX IF NOT EXISTS sponsors_listing ON sponsors (active, tier, position)");
 
     backend = "sqlite";
     console.log(`[db.ts] SQLite initialized at ${sqlitePath}`);
@@ -909,6 +954,143 @@ export async function addNotifySignup(
   }
 }
 
+const SPONSOR_FIELDS = [
+  "name",
+  "url",
+  "tier",
+  "position",
+  "active",
+  "logo",
+  "logo_width",
+  "logo_height",
+  "updated_at",
+] as const;
+
+// SQLite stores active as 0/1; both backends hand callers a real boolean.
+function rowToSponsor(row: Record<string, unknown>): SponsorRecord {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    url: row.url as string,
+    tier: row.tier as SponsorTier,
+    position: Number(row.position ?? 0),
+    active: row.active === true || row.active === 1,
+    logo: row.logo as string,
+    logo_width: Number(row.logo_width),
+    logo_height: Number(row.logo_height),
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+  };
+}
+
+// principal before colaborador, then the admin-chosen position, then name so
+// ties are stable.
+function compareSponsors(a: SponsorRecord, b: SponsorRecord): number {
+  if (a.tier !== b.tier) return a.tier === "principal" ? -1 : 1;
+  if (a.position !== b.position) return a.position - b.position;
+  return a.name.localeCompare(b.name, "es");
+}
+
+/**
+ * All sponsors (admin) or only the visible ones (public page), sorted by
+ * tier, position and name on both backends.
+ */
+export async function listSponsors(activeOnly: boolean = false): Promise<SponsorRecord[]> {
+  let sponsors: SponsorRecord[];
+  if (backend === "mongodb") {
+    const docs = await sponsorsCollection!.find(activeOnly ? { active: true } : {}).toArray();
+    sponsors = docs.map(rowToSponsor);
+  } else {
+    const query = activeOnly ? "SELECT * FROM sponsors WHERE active = 1" : "SELECT * FROM sponsors";
+    sponsors = (sqliteDb!.query(query).all() as Record<string, unknown>[]).map(rowToSponsor);
+  }
+  return sponsors.sort(compareSponsors);
+}
+
+export async function getSponsorById(id: string): Promise<SponsorRecord | null> {
+  if (backend === "mongodb") {
+    const doc = await sponsorsCollection!.findOne({ id });
+    return doc ? rowToSponsor(doc) : null;
+  }
+  const row = sqliteDb!.query("SELECT * FROM sponsors WHERE id = ?").get(id) as Record<string, unknown> | null;
+  return row ? rowToSponsor(row) : null;
+}
+
+/**
+ * Active principal sponsors, optionally ignoring one (the sponsor being
+ * edited, so re-saving an already-active principal doesn't count it twice).
+ */
+export async function countActivePrincipalSponsors(excludeId?: string): Promise<number> {
+  if (backend === "mongodb") {
+    const filter: Record<string, unknown> = { active: true, tier: "principal" };
+    if (excludeId) filter.id = { $ne: excludeId };
+    return sponsorsCollection!.countDocuments(filter);
+  }
+  const row = sqliteDb!
+    .query("SELECT COUNT(*) AS count FROM sponsors WHERE active = 1 AND tier = 'principal' AND id != ?")
+    .get(excludeId ?? "") as { count: number };
+  return row.count;
+}
+
+export async function createSponsor(sponsor: SponsorRecord): Promise<void> {
+  if (backend === "mongodb") {
+    await sponsorsCollection!.insertOne({ ...sponsor });
+    return;
+  }
+  sqliteDb!
+    .prepare(
+      `INSERT INTO sponsors (
+        id, name, url, tier, position, active, logo, logo_width, logo_height, created_at, updated_at
+      ) VALUES ($id, $name, $url, $tier, $position, $active, $logo, $logo_width, $logo_height,
+        $created_at, $updated_at)`,
+    )
+    .run({
+      $id: sponsor.id,
+      $name: sponsor.name,
+      $url: sponsor.url,
+      $tier: sponsor.tier,
+      $position: sponsor.position,
+      $active: sponsor.active ? 1 : 0,
+      $logo: sponsor.logo,
+      $logo_width: sponsor.logo_width,
+      $logo_height: sponsor.logo_height,
+      $created_at: sponsor.created_at,
+      $updated_at: sponsor.updated_at,
+    });
+}
+
+export async function updateSponsor(id: string, updates: SponsorUpdate): Promise<boolean> {
+  // Only known columns ever reach the SQL text; values are always bound.
+  const keys = SPONSOR_FIELDS.filter((key) => key in updates);
+  if (keys.length === 0) return false;
+  if (backend === "mongodb") {
+    const set: Record<string, unknown> = {};
+    for (const key of keys) set[key] = updates[key];
+    const result = await sponsorsCollection!.updateOne({ id }, { $set: set });
+    return result.matchedCount > 0;
+  }
+  const values = keys.map((key) => {
+    const value = updates[key];
+    return typeof value === "boolean" ? (value ? 1 : 0) : (value ?? null);
+  });
+  const setClauses = keys.map((key) => `${key} = ?`).join(", ");
+  return sqliteDb!.prepare(`UPDATE sponsors SET ${setClauses} WHERE id = ?`).run(...values, id).changes > 0;
+}
+
+/**
+ * Delete a sponsor, returning the removed row so the caller can unlink its logo.
+ */
+export async function deleteSponsor(id: string): Promise<SponsorRecord | null> {
+  const existing = await getSponsorById(id);
+  if (!existing) return null;
+  if (backend === "mongodb") {
+    await sponsorsCollection!.deleteOne({ id });
+  } else {
+    sqliteDb!.prepare("DELETE FROM sponsors WHERE id = ?").run(id);
+  }
+  return existing;
+}
+
 /**
  * Close the database connection.
  */
@@ -922,6 +1104,7 @@ export async function closeDatabase(): Promise<void> {
     auditLogCollection = null;
     notifySignupsCollection = null;
     photoVotesCollection = null;
+    sponsorsCollection = null;
   }
 
   if (sqliteDb) {
