@@ -2108,6 +2108,162 @@ textarea {
   margin-bottom: 24px;
 }
 
+/* Admin "Patrocinadores": form + list. Every logo sits on the page's own
+   cream (--bg-light) so the admin sees exactly how it will look in the web. */
+.sponsors-panel {
+  margin-top: 24px;
+}
+
+.sponsors-admin-hint {
+  color: var(--muted);
+  margin: 8px 0 20px;
+}
+
+.sponsor-form {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sponsor-form h3 {
+  margin: 0;
+}
+
+.sponsor-form input[type="file"] {
+  min-height: 0;
+}
+
+.sponsor-form [aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.sponsor-active {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.sponsor-active input {
+  min-height: 0;
+}
+
+.field-error {
+  color: #ffb4b4;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field-error:empty {
+  display: none;
+}
+
+.sponsor-form-status {
+  color: var(--muted);
+  margin: 0;
+}
+
+.sponsor-preview {
+  background: var(--bg-light);
+  border-radius: 8px;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+}
+
+.sponsor-preview img {
+  display: inline-block;
+  height: 96px;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
+}
+
+.sponsor-preview figcaption {
+  color: var(--muted-on-light);
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+.sponsor-admin-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.sponsor-admin-item {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.sponsor-admin-item.is-hidden .sponsor-logo-box {
+  opacity: 0.45;
+}
+
+.sponsor-logo-box {
+  align-items: center;
+  background: var(--bg-light);
+  border-radius: 6px;
+  display: flex;
+  height: 84px;
+  justify-content: center;
+  padding: 10px;
+}
+
+.sponsor-logo-box img {
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
+}
+
+.sponsor-admin-item h3 {
+  margin: 4px 0;
+}
+
+.sponsor-admin-item a {
+  color: var(--gold);
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.sponsor-admin-item small,
+.sponsor-admin-empty {
+  color: var(--muted);
+}
+
+.sponsor-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.sponsor-badges .status-badge {
+  margin-bottom: 0;
+}
+
+.status-badge.sponsor-tier-principal {
+  background: rgba(242, 149, 74, 0.2);
+  color: var(--accent-bright);
+}
+
+.status-badge.sponsor-tier-colaborador {
+  background: rgba(92, 120, 180, 0.25);
+  color: #c9d6f5;
+}
+
+@media (max-width: 760px) {
+  .sponsor-form,
+  .sponsor-admin-item {
+    grid-template-columns: 1fr;
+  }
+}
+
 .votes-list {
   display: grid;
   gap: 10px;
@@ -2678,6 +2834,127 @@ textarea {
    ("Cómo participar" / the gallery), so the gap below the content matches
    the gap above it. "El billete de vuelta" reuses the concept layout. */
 .concept,
+/* Patrocinadores: on the cream page background (no card fill), between the
+   orange quote banner and "El billete de vuelta". Every logo in a tier gets
+   the same height; width follows the logo's own proportions, capped so a
+   very wide logo can't dominate the row. object-fit keeps capped logos
+   undistorted instead of squashing them. */
+/* No bottom padding: the gap below is .return-ticket's own top padding, so
+   "El billete de vuelta" keeps exactly the spacing it had under the orange
+   banner (116px desktop, 84px mobile, eyebrow to last logo). The top padding
+   gives the same gap above: banner to first heading. */
+.sponsors {
+  padding: 100px clamp(18px, 4vw, 56px) 0;
+  text-align: center;
+}
+
+.sponsors-tier + .sponsors-tier {
+  margin-top: 56px;
+}
+
+.sponsors-heading {
+  color: #bc622a;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.16em;
+  line-height: var(--lh-normal);
+  margin: 0 0 28px;
+  text-transform: uppercase;
+}
+
+.sponsors-logos {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sponsor-gap-y) var(--sponsor-gap-x);
+  justify-content: center;
+  list-style: none;
+  margin: 0 auto;
+  max-width: 1160px;
+  padding: 0;
+}
+
+.sponsors-logos li {
+  max-width: 100%;
+}
+
+.sponsor-link {
+  border-radius: 6px;
+  display: block;
+}
+
+.sponsor-link:focus-visible {
+  outline: 3px solid var(--coral);
+  outline-offset: 6px;
+}
+
+/* The width cap is in px on purpose: a percentage max-width is ignored when
+   the <li> sizes itself to its content, so a very wide logo reserved its full
+   uncapped width and left a hole next to it. Each breakpoint keeps the cap
+   below the space available at its narrowest width. */
+.sponsors-logos img {
+  height: var(--sponsor-logo-h);
+  max-width: var(--sponsor-logo-max-w);
+  object-fit: contain;
+  width: auto;
+}
+
+/* Three principal logos at their widest still share one row of the 1160px
+   list: 3 x 340 + 2 x 64 = 1148. */
+.sponsors-tier-principal {
+  --sponsor-logo-h: 96px;
+  --sponsor-logo-max-w: 340px;
+  --sponsor-gap-x: 64px;
+  --sponsor-gap-y: 40px;
+}
+
+.sponsors-tier-colaborador {
+  --sponsor-logo-h: 52px;
+  --sponsor-logo-max-w: 220px;
+  --sponsor-gap-x: 48px;
+  --sponsor-gap-y: 28px;
+}
+
+@media (max-width: 900px) {
+  .sponsors {
+    padding-top: 68px;
+  }
+
+  .sponsors-tier + .sponsors-tier {
+    margin-top: 40px;
+  }
+
+  .sponsors-tier-principal {
+    --sponsor-logo-h: 72px;
+    --sponsor-logo-max-w: 280px;
+    --sponsor-gap-x: 40px;
+    --sponsor-gap-y: 28px;
+  }
+
+  .sponsors-tier-colaborador {
+    --sponsor-logo-h: 44px;
+    --sponsor-logo-max-w: 160px;
+    --sponsor-gap-x: 28px;
+    --sponsor-gap-y: 20px;
+  }
+}
+
+@media (max-width: 400px) {
+  /* 320px viewport: 320 - 2x12 page margin - 2x18 section padding = 260. */
+  .sponsors-tier-principal {
+    --sponsor-logo-h: 60px;
+    --sponsor-logo-max-w: 240px;
+    --sponsor-gap-x: 28px;
+  }
+
+  .sponsors-tier-colaborador {
+    --sponsor-logo-h: 38px;
+    --sponsor-logo-max-w: 130px;
+    --sponsor-gap-x: 22px;
+    --sponsor-gap-y: 18px;
+  }
+}
+
 .return-ticket {
   padding: 96px clamp(18px, 4vw, 56px) 32px;
 }

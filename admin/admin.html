@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/styles.css?v=20260928-1">
+    <link rel="stylesheet" href="/styles.css?v=20260928-2">
   </head>
   <body>
     <header class="topbar" id="topbar">
@@ -43,6 +43,7 @@
                 <li><a href="#revision" data-jump-status="rejected">Rechazadas</a></li>
               </ul>
             </div>
+            <a class="admin-quick" href="#adminSponsors">Patrocinadores</a>
           </div>
           <a class="admin-quick admin-quick-public" href="/#mapa-en-vivo" target="_blank" rel="noopener">
             Ver mapa público
@@ -123,6 +124,59 @@
           <div class="review-list" id="reviewList"></div>
           <nav class="pager hidden" id="reviewPager" aria-label="Paginación de contribuciones"></nav>
         </div>
+        <section class="sponsors-panel chart-card hidden" id="adminSponsors" aria-labelledby="sponsors-admin-title">
+          <p class="eyebrow" id="sponsors-admin-title">Patrocinadores</p>
+          <p class="sponsors-admin-hint">
+            Principales: logos grandes, hasta <span id="sponsorMaxPrincipal">3</span> visibles
+            (ahora <strong id="sponsorPrincipalCount">0</strong>). Colaboradores: fila de logos más pequeños.
+            Los cambios se ven en la web al guardar.
+          </p>
+          <form class="sponsor-form" id="sponsorForm" novalidate>
+            <h3 class="wide" id="sponsorFormTitle">Añadir patrocinador</h3>
+            <label class="wide">
+              Logo (PNG o WebP con fondo transparente)
+              <input name="logo" type="file" accept="image/png,image/webp" aria-describedby="sponsorErrorLogo">
+              <span class="field-error" id="sponsorErrorLogo" data-error-for="logo"></span>
+            </label>
+            <figure class="sponsor-preview wide hidden" id="sponsorPreview">
+              <img alt="">
+              <figcaption>Vista previa sobre el fondo crema de la web</figcaption>
+            </figure>
+            <label>
+              Nombre
+              <input name="name" maxlength="120" required aria-describedby="sponsorErrorName">
+              <span class="field-error" id="sponsorErrorName" data-error-for="name"></span>
+            </label>
+            <label>
+              Web
+              <input name="url" inputmode="url" maxlength="500" placeholder="www.empresa.com" required aria-describedby="sponsorErrorUrl">
+              <span class="field-error" id="sponsorErrorUrl" data-error-for="url"></span>
+            </label>
+            <label>
+              Nivel
+              <select name="tier" aria-describedby="sponsorErrorTier">
+                <option value="principal">Principal</option>
+                <option value="colaborador" selected>Colaborador</option>
+              </select>
+              <span class="field-error" id="sponsorErrorTier" data-error-for="tier"></span>
+            </label>
+            <label>
+              Orden (menor, antes)
+              <input name="position" type="number" min="0" max="9999" step="1" value="0" aria-describedby="sponsorErrorPosition">
+              <span class="field-error" id="sponsorErrorPosition" data-error-for="position"></span>
+            </label>
+            <label class="sponsor-active wide">
+              <input name="active" type="checkbox" checked>
+              Visible en la web
+            </label>
+            <div class="form-actions wide">
+              <button class="button primary" type="submit" id="sponsorSubmit">Añadir</button>
+              <button class="button ghost hidden" type="button" id="sponsorCancel">Cancelar edición</button>
+            </div>
+            <p class="wide sponsor-form-status" id="sponsorFormStatus" role="status"></p>
+          </form>
+          <div class="sponsor-admin-list" id="sponsorAdminList"></div>
+        </section>
       </section>
     </main>
 
@@ -159,6 +213,6 @@
     </template>
 
     <script src="/nav-toggle.js?v=20260925-2"></script>
-    <script src="admin.js?v=20260925-5"></script>
+    <script src="admin.js?v=20260928-1"></script>
   </body>
 </html>

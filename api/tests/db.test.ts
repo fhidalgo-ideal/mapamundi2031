@@ -19,8 +19,76 @@ import {
   getAuditLogs,
   addNotifySignup,
   closeDatabase,
+  listSponsors,
+  getSponsorById,
+  countActivePrincipalSponsors,
+  createSponsor,
+  updateSponsor,
+  deleteSponsor,
   TraceRecord,
+  SponsorRecord,
 } from "../db";
+
+// Same sponsor assertions against both backends. Ids are unique per run so a
+// reused Mongo test database never collides with an earlier run's rows.
+function sponsorTests() {
+  const run = Date.now().toString(36);
+  const make = (suffix: string, overrides: Partial<SponsorRecord> = {}): SponsorRecord => ({
+    id: `sponsor-${run}-${suffix}`,
+    name: `Sponsor ${suffix}`,
+    url: "https://example.com/",
+    tier: "colaborador",
+    position: 0,
+    active: true,
+    logo: `/uploads/sponsors/${suffix}.png`,
+    logo_width: 300,
+    logo_height: 100,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  });
+  const mine = (sponsors: SponsorRecord[]) => sponsors.filter((s) => s.id.startsWith(`sponsor-${run}-`));
+
+  it("should create sponsors and list them by tier, position and name", async () => {
+    await createSponsor(make("c2", { position: 2 }));
+    await createSponsor(make("c1", { position: 1, name: "Beta" }));
+    await createSponsor(make("c1b", { position: 1, name: "Alfa" }));
+    await createSponsor(make("p1", { tier: "principal", position: 5 }));
+    await createSponsor(make("hidden", { active: false }));
+
+    const all = mine(await listSponsors());
+    expect(all.map((s) => s.id.split("-").pop())).toEqual(["p1", "hidden", "c1b", "c1", "c2"]);
+    expect(all.find((s) => s.id.endsWith("hidden"))?.active).toBe(false);
+
+    const visible = mine(await listSponsors(true));
+    expect(visible.some((s) => s.id.endsWith("hidden"))).toBe(false);
+    expect(typeof visible[0].active).toBe("boolean");
+    expect(visible[0].logo_width).toBe(300);
+  });
+
+  it("should count active principal sponsors, optionally excluding one", async () => {
+    const before = await countActivePrincipalSponsors();
+    await createSponsor(make("p2", { tier: "principal" }));
+    await createSponsor(make("p3", { tier: "principal", active: false }));
+    expect(await countActivePrincipalSponsors()).toBe(before + 1);
+    expect(await countActivePrincipalSponsors(`sponsor-${run}-p2`)).toBe(before);
+  });
+
+  it("should update and delete a sponsor", async () => {
+    const id = `sponsor-${run}-c2`;
+    expect(await updateSponsor(id, { name: "Renamed", active: false, position: 9 })).toBe(true);
+    const updated = await getSponsorById(id);
+    expect(updated?.name).toBe("Renamed");
+    expect(updated?.active).toBe(false);
+    expect(updated?.position).toBe(9);
+    expect(await updateSponsor("sponsor-missing", { name: "x" })).toBe(false);
+
+    const deleted = await deleteSponsor(id);
+    expect(deleted?.logo).toBe("/uploads/sponsors/c2.png");
+    expect(await getSponsorById(id)).toBeNull();
+    expect(await deleteSponsor(id)).toBeNull();
+  });
+}
 
 // Test SQLite backend
 describe("Database Layer - SQLite", () => {
@@ -246,6 +314,8 @@ describe("Database Layer - SQLite", () => {
     expect(logs.length).toBeGreaterThan(0);
     expect(logs.some((l) => l.id === logId)).toBe(true);
   });
+
+  sponsorTests();
 });
 
 // Test MongoDB backend (only if GRANADA_TEST_MONGO_URI is set)
@@ -408,4 +478,6 @@ describe.skipIf(!process.env.GRANADA_TEST_MONGO_URI)("Database Layer - MongoDB",
     expect(logs.length).toBeGreaterThan(0);
     expect(logs.some((l) => l.id === logId)).toBe(true);
   });
+
+  sponsorTests();
 });
