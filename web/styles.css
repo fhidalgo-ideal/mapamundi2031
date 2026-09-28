@@ -2962,13 +2962,6 @@ textarea {
   border-bottom-right-radius: 0;
 }
 
-/* Extra breathing room above it (112px total with the 16px card gap, the
-   same rhythm as around "El concepto") so it doesn't read as glued to the
-   delete-photo banner. */
-.closing {
-  margin-top: 96px;
-}
-
 .page-stack:has(> .closing:last-child) + .site-footer {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
