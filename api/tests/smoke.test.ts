@@ -739,7 +739,7 @@ describe("smoke", () => {
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
       "Referrer-Policy": "strict-origin-when-cross-origin",
-      "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com",
+      "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com",
     };
 
     const endpoints = ["/", "/api/health", "/api/traces"];
